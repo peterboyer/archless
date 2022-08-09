@@ -6,12 +6,9 @@ set -e
 
 <% if (false) /* TODO: REMOVE */ { %>
 
-<% if (cNtp === true) { %>
+<% if (cNtp) { %>
+  # TODO: check that ntp is set true after reboot
   timedatectl set-ntp true
-<% } %>
-
-<% if (typeof kMap === "string") { %>
-  loadkeys <%= kMap %>
 <% } %>
 
 <% if (pScheme) { %>
@@ -105,4 +102,30 @@ set -e
   fi
 <% } %>
 
+reflector
+
+pacman -Sy --noconfirm archlinux-keyring
+
+pacstrap /mnt base base-devel linux linux-firmware grub efibootmgr
+
 <% } /* TODO: REMOVE */ %>
+
+genfstab -U /mnt >> /mnt/etc/fstab
+
+arch-chroot /mnt
+
+ln -sf /usr/share/zoneinfo/<%= tz %> /etc/localtime
+hwclock --systohc
+
+sed -i 's/#<%= lang %>.UTF-8/<%= lang %>.UTF-8/g' /etc/locale.gen
+locale-gen
+echo "LANG=<%= lang %>.UTF-8" > /etc/locale.conf
+
+<% if (keymap) { %>
+  loadkeys <%= keymap %>
+  echo "KEYMAP=<%= keymap %>" > /etc/vconsole.conf
+<% } %>
+
+echo "<%= host %>" > /etc/hostname
+
+

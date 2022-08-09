@@ -15,6 +15,11 @@ usage (execute): curl <host>/install.sh | bash
 true  = "true"  or "y"
 false = "false" or "n"
 
+tz        link given timezone via /usr/share/zoneinfo
+            string -> link given <string> to /etc/localtime
+            *false -> skip (use timezone info as is)
+lang      set language locale on locale.gen and locale.conf
+            string | *en_US -> use given localisation string as UTF-8
 cNtp      enable synchronised clock via ntp
             *true -> will enable
             false -> skip (use system clock as is)
@@ -36,13 +41,17 @@ pSwap     include swap partition with given size (if partitioning)
 
 pFs       filesystem to use for root partition (if partitioning)
             string | *btrfs -> use with mkfs.<string>
+
 `;
 }
 
 function install(options: {
   template: (data: {
+    tz: string | "UTC";
+    lang: string | "en_US";
+    host: string | "arch";
     cNtp: false | true;
-    kMap: false | string;
+    keymap: false | string;
     pScheme: false | "auto" | "gpt" | "mbr";
     pSwap: false | true | number | "memory";
     pFs: string | "btrfs";
@@ -51,6 +60,36 @@ function install(options: {
 }): string {
   const { query, template } = options;
   return template({
+    tz: (() => {
+      const value = query["tz"];
+      if (!value) {
+        if ("tz" in query) {
+          throw new Error("query.tz expected value");
+        }
+        return "UTC";
+      }
+      return value;
+    })(),
+    lang: (() => {
+      const value = query["lang"];
+      if (!value) {
+        if ("lang" in query) {
+          throw new Error("query.lang expected value");
+        }
+        return "en_US";
+      }
+      return value;
+    })(),
+    host: (() => {
+      const value = query["host"];
+      if (!value) {
+        if ("host" in query) {
+          throw new Error("query.host expected value");
+        }
+        return "arch";
+      }
+      return value;
+    })(),
     cNtp: (() => {
       const value = query["cNtp"];
       if (!value) {
@@ -65,11 +104,11 @@ function install(options: {
       }
       throw new Error("query.cNtp invalid value");
     })(),
-    kMap: (() => {
-      const value = query["kMap"];
+    keymap: (() => {
+      const value = query["keymap"];
       if (!value) {
-        if ("kMap" in query) {
-          throw new Error("query.kMap expected value");
+        if ("keymap" in query) {
+          throw new Error("query.keymap expected value");
         }
         return false;
       }
