@@ -15,43 +15,43 @@ usage (execute): curl <host>/install.sh | bash
 true  = "true"  or "y"
 false = "false" or "n"
 
-cNtp      false | *true
-          enable synchronised clock via ntp
-            true -> will enable
-            false -> skip
+cNtp      enable synchronised clock via ntp
+            *true -> will enable
+            false -> skip (use system clock as is)
 
-kMap      *false | string
-          load given keyboard mapfile
+kMap      load given keyboard mapfile
             string -> will load given <string> keyboard mapfile
-            false -> skip
+            *false -> skip (use default keyboard layout)
 
-pScheme   false | *auto | gpt | mbr
-          partition drive with
-            auto -> will determine from boot mode
+pScheme   partition drive using scheme
+            *auto -> will determine from boot mode
             gpt | mbr -> explicitly use given scheme
-            false -> skip partitioning completely
+            false -> skip (use drive layout as is)
 
-pSwap     false | true | number | *memory
-          include swap partition with given size when partitioning
+pSwap     include swap partition with given size (if partitioning)
             true -> 1 GB
             number -> <number> GB
-            memory -> equal to size of system memory
+            *memory -> equal to size of system memory
             false | 0 -> no swap partition
+
+pFs       filesystem to use for root partition (if partitioning)
+            string | *btrfs -> use with mkfs.<string>
 `;
 }
 
 function install(options: {
   template: (data: {
-    clock_ntp: false | true;
-    keyboard_mapfile: false | string;
-    partition_scheme?: false | "auto" | "gpt" | "mbr";
-    partition_swap: false | true | number | "memory";
+    cNtp: false | true;
+    kMap: false | string;
+    pScheme: false | "auto" | "gpt" | "mbr";
+    pSwap: false | true | number | "memory";
+    pFs: string | "btrfs";
   }) => string;
   query: Record<string, string>;
 }): string {
   const { query, template } = options;
   return template({
-    clock_ntp: (() => {
+    cNtp: (() => {
       const value = query["cNtp"];
       if (!value) {
         if ("cNtp" in query) {
@@ -65,7 +65,7 @@ function install(options: {
       }
       throw new Error("query.cNtp invalid value");
     })(),
-    keyboard_mapfile: (() => {
+    kMap: (() => {
       const value = query["kMap"];
       if (!value) {
         if ("kMap" in query) {
@@ -75,28 +75,7 @@ function install(options: {
       }
       return value;
     })(),
-    partition_swap: (() => {
-      const value = query["pSwap"];
-      if (!value) {
-        if ("pSwap" in query) {
-          throw new Error("query.pSwap expected value");
-        }
-        return "memory";
-      } else if (value === "false" || value === "n") {
-        return false;
-      } else if (value === "true" || value === "y") {
-        return true;
-      } else if (value === "memory" || value === "m") {
-        return "memory";
-      } else {
-        const valueNumber = parseInt(value, 10);
-        if (Number.isNaN(valueNumber)) {
-          throw new Error("query.pSwap invalid number");
-        }
-        return valueNumber;
-      }
-    })(),
-    partition_scheme: (() => {
+    pScheme: (() => {
       const value = query["pScheme"];
       if (!value) {
         if ("pScheme" in query) {
@@ -114,11 +93,40 @@ function install(options: {
       }
       throw new Error("query.pScheme invalid value");
     })(),
+    pSwap: (() => {
+      const value = query["pSwap"];
+      if (!value) {
+        if ("pSwap" in query) {
+          throw new Error("query.pSwap expected value");
+        }
+        return "memory";
+      } else if (value === "false" || value === "n") {
+        return false;
+      } else if (value === "true" || value === "y") {
+        return true;
+      } else if (value === "memory" || value === "m") {
+        return "memory";
+      }
+      const valueNumber = parseInt(value, 10);
+      if (Number.isNaN(valueNumber)) {
+        throw new Error("query.pSwap invalid number");
+      }
+      return valueNumber;
+    })(),
+    pFs: (() => {
+      const value = query["pFs"];
+      if (!value) {
+        if ("pFs" in query) {
+          throw new Error("query.pFs expected value");
+        }
+        return "btrfs";
+      }
+      return value;
+    })(),
   });
 }
 
 const app = Express();
-const template = ejs.compile(fs.readFileSync("./install.ejs").toString());
 
 app.get("/install.sh", (req, res) => {
   const query = req.query as Record<string, string>;
@@ -127,6 +135,7 @@ app.get("/install.sh", (req, res) => {
     return res.send(help());
   }
 
+  const template = ejs.compile(fs.readFileSync("./install.ejs").toString());
   return res.send(install({ template, query }));
 });
 

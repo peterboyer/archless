@@ -1,46 +1,108 @@
 #!/bin/env bash
 
+set -x
+
 set -e
 
-<% if (clock_ntp === true) { %>
+<% if (false) /* TODO: REMOVE */ { %>
+
+<% if (cNtp === true) { %>
   timedatectl set-ntp true
 <% } %>
 
-<% if (typeof keyboard_mapfile === "string") { %>
-  loadkeys <%- keyboard_mapfile %>
+<% if (typeof kMap === "string") { %>
+  loadkeys <%= kMap %>
 <% } %>
 
-<% if (partition_scheme !== undefined) { %>
-  <% if (partition_swap === true) { %>
-    SWAPGB="1"
-  <% } else if (typeof partition_swap === "number" && partition_swap > 0) { %>
-    SWAPGB="<%= partition_swap %>"
-  <% } else if (partition_swap === "memory") { %>
-    SWAPGB="$(free --giga | grep Mem | awk '{ print $2 }')"
+<% if (pScheme) { %>
+  <% if (pScheme === "auto") { %>
+    set +e
+    ls /sys/firmware/efi/efivars &> /dev/null
+    RESULT=$?
+    set -e
+    if [[ $RESULT -eq 0 ]]; then
+      DEV_SCHEME="gpt"
+    else
+      DEV_SCHEME="mbr"
+    fi
+  <% } else if (pScheme === "gpt") { %>
+    DEV_SCHEME="gpt"
+  <% } else if (pScheme === "mbr") { %>
+    DEV_SCHEME="mbr"
   <% } %>
-  <% if (partition_scheme) { %>
-    <% if (partition_scheme === "auto") { %>
-      set +e
-      ls /sys/firmware/efi/efivars &> /dev/null
-      if [[ $? -eq 0 ]]; then
-        PARTITIONSCHEME=g
-      else
-        PARTITIONSCHEME=M
-      fi
-      set -e
-    <% } else if (partition_scheme === "gpt") { %>
-      PARTITIONSCHEME=g
-    <% } else if (partition_scheme === "mbr") { %>
-      PARTITIONSCHEME=M
-    <% } %>
+
+  <% if (pSwap === true) { %>
+    DEV_SWAP_GB="1"
+  <% } else if (typeof pSwap === "number" && pSwap > 0) { %>
+    DEV_SWAP_GB="<%= pSwap %>"
+  <% } else if (pSwap === "memory") { %>
+    DEV_SWAP_GB="$(free --giga | grep Mem | awk '{ print $2 }')"
+  <% } %>
+
+  DEV="/dev/$(lsblk | grep disk | awk '{ print $1 }')"
+  if [[ -n "$(echo $DEV | grep nvme)" ]]; then
+    DEV_PRE="p"
+  else
+    DEV_PRE=""
+  fi
+
+  if [[ "$DEV_SCHEME" == "gpt" ]]; then
     (
-      echo $PARTITIONSCHEME;
+      echo g;
       echo n; echo; echo; echo +300M;
-      <% if (partition_swap) { %>
-        echo n; echo; echo; echo "+$(expr $SWAPGB)G";
+      <% if (pSwap) { %>
+        echo n; echo; echo; echo "+$(expr $DEV_SWAP_GB)G";
       <% } %>
       echo n; echo; echo; echo;
       echo w;
-    ) | fdisk $dev &>/dev/null
-  <% } %>
+    ) | fdisk $DEV --wipe always --wipe-partitions always &>/dev/null
+
+    DEV_BOOT="${DEV}${DEV_PRE}1"
+    mkfs.fat -F 32 $DEV_BOOT
+
+    <% if (pSwap) { %>
+      DEV_SWAP="${DEV}${DEV_PRE}2"
+      mkswap $DEV_SWAP
+
+      DEV_ROOT="${DEV}${DEV_PRE}3"
+      mkfs.<%= pFs %> -f $DEV_ROOT
+    <% } else { %>
+      DEV_ROOT="${DEV}${DEV_PRE}2"
+      mkfs.<%= pFs %> -f $DEV_ROOT
+    <% } %>
+
+    mount --mkdir $DEV_ROOT /mnt
+    mount --mkdir $DEV_BOOT /mnt/boot
+    <% if (pSwap) { %>
+      swapon $DEV_SWAP
+    <% } %>
+
+  elif [[ "$DEV_SCHEME" == "mbr" ]]; then
+    (
+      echo o;
+      <% if (pSwap) { %>
+        echo n; echo; echo; echo; echo "+$(expr $DEV_SWAP_GB)G";
+      <% } %>
+      echo n; echo; echo; echo; echo;
+      echo w;
+    ) | fdisk $DEV --wipe always --wipe-partitions always &>/dev/null
+
+    <% if (pSwap) { %>
+      DEV_SWAP="${DEV}${DEV_PRE}1"
+      mkswap $DEV_SWAP
+
+      DEV_ROOT="${DEV}${DEV_PRE}2"
+      mkfs.<%= pFs %> -f $DEV_ROOT
+    <% } else { %>
+      DEV_ROOT="${DEV}${DEV_PRE}1"
+      mkfs.<%= pFs %> -f $DEV_ROOT
+    <% } %>
+
+    mount --mkdir $DEV_ROOT /mnt
+    <% if (pSwap) { %>
+      swapon $DEV_SWAP
+    <% } %>
+  fi
 <% } %>
+
+<% } /* TODO: REMOVE */ %>
