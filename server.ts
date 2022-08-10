@@ -11,10 +11,9 @@ function help(): string {
 
 usage (preview): curl <host>/install.sh
 usage (execute): curl <host>/install.sh | bash
+usage (options): curl <host>/install.sh?tz=Australia/Sydney&lang=en_AU
 
 *default
-true  = "true"  or "y"
-false = "false" or "n"
 
 tz        link given timezone via /usr/share/zoneinfo
             string | *UTC -> link given <string> to /etc/localtime
@@ -40,10 +39,6 @@ ntp       enable synchronised clock via ntp
 keymap    load given keyboard mapfile
             string | *US -> will load given <string> keyboard mapfile
 
-scheme    partition drive using scheme
-            *auto -> will determine from boot mode
-            gpt | mbr -> explicitly use given scheme
-
 swap      include swap partition with given size (if partitioning)
             number -> <number> GB
             *memory -> equal to size of system memory
@@ -63,7 +58,6 @@ const Options = z.object({
   ucode: z.enum(["auto", "intel", "amd", "none"]).default("auto"),
   ntp: z.boolean().default(true),
   keymap: z.string().default("US"),
-  scheme: z.enum(["auto", "gpt", "mbr"]).default("auto"),
   swap: z
     .union([
       z.preprocess((v) => parseInt(`${v}`, 10), z.number()),
@@ -71,6 +65,15 @@ const Options = z.object({
     ])
     .default("memory"),
   fs: z.string().default("btrfs"),
+  nodisk: z
+    .preprocess((v) => v === "" || v === "true", z.boolean())
+    .default(false),
+  noreflector: z
+    .preprocess((v) => v === "" || v === "true", z.boolean())
+    .default(false),
+  nosync: z
+    .preprocess((v) => v === "" || v === "true", z.boolean())
+    .default(false),
 });
 
 type Options = z.infer<typeof Options>;

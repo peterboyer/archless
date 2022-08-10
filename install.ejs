@@ -8,17 +8,11 @@ set -e
   timedatectl set-ntp true
 <% } %>
 
-<% if (scheme === "auto") { %>
-  if [[ -d /sys/firmware/efi/efivars ]]; then
-    SCHEME="gpt"
-  else
-    SCHEME="mbr"
-  fi
-<% } else if (scheme === "gpt") { %>
+if [[ -d /sys/firmware/efi/efivars ]]; then
   SCHEME="gpt"
-<% } else if (scheme === "mbr") { %>
+else
   SCHEME="mbr"
-<% } %>
+fi
 
 <% if (swap === "memory") { %>
   SWAP_GB="$(free --giga | grep Mem | awk '{ print $2 }')"
@@ -34,86 +28,119 @@ else
 fi
 
 if [[ "$SCHEME" == "gpt" ]]; then
-  (
-    echo g;
-    echo n; echo; echo; echo +300M;
-    <% if (swap) { %>
-      echo n; echo; echo; echo "+$(expr $SWAP_GB)G";
-    <% } %>
-    echo n; echo; echo; echo;
-    echo w;
-  ) | fdisk $DEV --wipe always --wipe-partitions always &>/dev/null
+  <% if (!nodisk) { %>
+    (
+      echo g;
+      echo n; echo; echo; echo +300M;
+      <% if (swap) { %>
+        echo n; echo; echo; echo "+$(expr $SWAP_GB)G";
+      <% } %>
+      echo n; echo; echo; echo;
+      echo w;
+    ) | fdisk $DEV --wipe always --wipe-partitions always &>/dev/null
+  <% } %>
 
   DEV_BOOT="${DEV}${DEV_PRE}1"
-  mkfs.fat -F 32 $DEV_BOOT
+
+  <% if (!nodisk) { %>
+    mkfs.fat -F 32 $DEV_BOOT
+  <% } %>
 
   <% if (swap) { %>
     DEV_SWAP="${DEV}${DEV_PRE}2"
-    mkswap $DEV_SWAP
+    <% if (!nodisk) { %>
+      mkswap $DEV_SWAP
+    <% } %>
 
     DEV_ROOT="${DEV}${DEV_PRE}3"
-    mkfs.<%= fs %> -f $DEV_ROOT
+    <% if (!nodisk) { %>
+      mkfs.<%= fs %> -f $DEV_ROOT
+    <% } %>
   <% } else { %>
     DEV_ROOT="${DEV}${DEV_PRE}2"
-    mkfs.<%= fs %> -f $DEV_ROOT
+    <% if (!nodisk) { %>
+      mkfs.<%= fs %> -f $DEV_ROOT
+    <% } %>
   <% } %>
 
-  mount --mkdir $DEV_ROOT /mnt
-  mount --mkdir $DEV_BOOT /mnt/boot
-  <% if (swap) { %>
-    swapon $DEV_SWAP
+
+  <% if (!nodisk) { %>
+    mount --mkdir $DEV_ROOT /mnt
+    mount --mkdir $DEV_BOOT /mnt/boot
+    <% if (swap) { %>
+      swapon $DEV_SWAP
+    <% } %>
+
+    genfstab -U /mnt > /mnt/etc/fstab
   <% } %>
 
 elif [[ "$SCHEME" == "mbr" ]]; then
-  (
-    echo o;
-    <% if (swap) { %>
-      echo n; echo; echo; echo; echo "+$(expr $SWAP_GB)G";
-    <% } %>
-    echo n; echo; echo; echo; echo;
-    echo w;
-  ) | fdisk $DEV --wipe always --wipe-partitions always &>/dev/null
+  <% if (!nodisk) { %>
+    (
+      echo o;
+      <% if (swap) { %>
+        echo n; echo; echo; echo; echo "+$(expr $SWAP_GB)G";
+      <% } %>
+      echo n; echo; echo; echo; echo;
+      echo w;
+    ) | fdisk $DEV --wipe always --wipe-partitions always &>/dev/null
+  <% } %>
 
   <% if (swap) { %>
     DEV_SWAP="${DEV}${DEV_PRE}1"
-    mkswap $DEV_SWAP
+    <% if (!nodisk) { %>
+      mkswap $DEV_SWAP
+    <% } %>
 
     DEV_ROOT="${DEV}${DEV_PRE}2"
-    mkfs.<%= fs %> -f $DEV_ROOT
+    <% if (!nodisk) { %>
+      mkfs.<%= fs %> -f $DEV_ROOT
+    <% } %>
   <% } else { %>
     DEV_ROOT="${DEV}${DEV_PRE}1"
-    mkfs.<%= fs %> -f $DEV_ROOT
+    <% if (!nodisk) { %>
+      mkfs.<%= fs %> -f $DEV_ROOT
+    <% } %>
   <% } %>
 
-  mount --mkdir $DEV_ROOT /mnt
-  <% if (swap) { %>
-    swapon $DEV_SWAP
+  <% if (!nodisk) { %>
+    mount --mkdir $DEV_ROOT /mnt
+    <% if (swap) { %>
+      swapon $DEV_SWAP
+    <% } %>
+
+    genfstab -U /mnt > /mnt/etc/fstab
   <% } %>
+else
+  echo panic: SCHEME invalid/not detected
+  exit 1;
 fi
 
-reflector
+<% if (!nosync) { %>
+  <% if (!noreflector) { %>
+    reflector
+  <% } %>
 
-pacman -Sy --noconfirm archlinux-keyring
+  pacman -Sy --noconfirm archlinux-keyring
 
-UCODE_PACKAGE=""
-<% if (ucode === "auto") { %>
-  if [[ -n "$(lscpu | grep GenuineIntel)" ]]; then
+  UCODE_PACKAGE=""
+  <% if (ucode === "auto") { %>
+    if [[ -n "$(lscpu | grep GenuineIntel)" ]]; then
+      UCODE_PACKAGE="intel-ucode"
+    elif [[ -n "$(lscpu | grep AuthenticAMD)" ]]; then
+      UCODE_PACKAGE="amd-ucode"
+    fi
+  <% } else if (ucode === "intel") { %>
     UCODE_PACKAGE="intel-ucode"
-  elif [[ -n "$(lscpu | grep AuthenticAMD)" ]]; then
+  <% } else if (ucode === "amd") { %>
     UCODE_PACKAGE="amd-ucode"
-  fi
-<% } else if (ucode === "intel") { %>
-  UCODE_PACKAGE="intel-ucode"
-<% } else if (ucode === "amd") { %>
-  UCODE_PACKAGE="amd-ucode"
+  <% } %>
+
+  pacstrap /mnt \
+    base base-devel \
+    linux linux-firmware $UCODE_PACKAGE \
+    grub efibootmgr
 <% } %>
-
-pacstrap /mnt \
-  base base-devel \
-  linux linux-firmware $UCODE_PACKAGE \
-  grub efibootmgr
-
-genfstab -U /mnt > /mnt/etc/fstab
 
 arch-chroot /mnt
 
@@ -131,17 +158,30 @@ echo "LANG=<%= lang %>.UTF-8" > /etc/locale.conf
 
 echo "<%= host %>" > /etc/hostname
 
-echo "127.0.0.1	localhost" >> /etc/hosts
-echo "::1		localhost" >> /etc/hosts
-echo "127.0.1.1	<%= host %>.localdomain	<%= host %>" >> /etc/hosts
+echo "::1        localhost" >> /etc/hosts
+echo "127.0.0.1  localhost" >> /etc/hosts
+echo "127.0.1.1  <%= host %>.localdomain <%= host %>" >> /etc/hosts
 
 # TODO: get password from user input
 chpasswd <<< "root:password"
+
+# TODO: remove duplication of scheme detection
+if [[ -d /sys/firmware/efi/efivars ]]; then
+  SCHEME="gpt"
+else
+  SCHEME="mbr"
+fi
+
+# TODO: remove duplication of DEV resolving
+DEV="/dev/$(lsblk | grep disk | awk '{ print $1 }')"
 
 if [[ "$SCHEME" == "gpt" ]]; then
   grub-install --target $DEV
 elif [[ "$SCHEME" == "mbr" ]]; then
   grub-install --target=i386-pc $DEV
+else
+  echo panic: SCHEME invalid/not detected
+  exit 1;
 fi
 
 grub-mkconfig -o /boot/grub/grub.cfg
