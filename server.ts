@@ -1,4 +1,5 @@
 import ejs from "ejs";
+import { z } from "zod";
 import Express from "express";
 import fs from "fs";
 
@@ -16,153 +17,74 @@ true  = "true"  or "y"
 false = "false" or "n"
 
 tz        link given timezone via /usr/share/zoneinfo
-            string -> link given <string> to /etc/localtime
-            *false -> skip (use timezone info as is)
+            string | *UTC -> link given <string> to /etc/localtime
+
 lang      set language locale on locale.gen and locale.conf
             string | *en_US -> use given localisation string as UTF-8
-cNtp      enable synchronised clock via ntp
+
+host      set hostname via /etc/hostname
+            string | *arch -> use as hostname
+
+user      set username
+            string | *admin -> use as username
+
+ucode     install ucode for cpu architecture
+            *auto -> will determine cpu ucode package using lscpu
+            intel | amd -> explicitly use for given cpu ucode
+            none (don't install any ucode package)
+
+ntp       enable synchronised clock via ntp
             *true -> will enable
             false -> skip (use system clock as is)
 
-kMap      load given keyboard mapfile
-            string -> will load given <string> keyboard mapfile
-            *false -> skip (use default keyboard layout)
+keymap    load given keyboard mapfile
+            string | *US -> will load given <string> keyboard mapfile
 
-pScheme   partition drive using scheme
+scheme    partition drive using scheme
             *auto -> will determine from boot mode
             gpt | mbr -> explicitly use given scheme
-            false -> skip (use drive layout as is)
 
-pSwap     include swap partition with given size (if partitioning)
-            true -> 1 GB
+swap      include swap partition with given size (if partitioning)
             number -> <number> GB
             *memory -> equal to size of system memory
-            false | 0 -> no swap partition
+            0 -> no swap partition
 
-pFs       filesystem to use for root partition (if partitioning)
+fs        filesystem to use for root partition
             string | *btrfs -> use with mkfs.<string>
 
 `;
 }
 
+const Options = z.object({
+  tz: z.string().default("UTC"),
+  lang: z.string().default("en_US"),
+  host: z.string().default("arch"),
+  user: z.string().default("admin"),
+  ucode: z.enum(["auto", "intel", "amd", "none"]).default("auto"),
+  ntp: z.boolean().default(true),
+  keymap: z.string().default("US"),
+  scheme: z.enum(["auto", "gpt", "mbr"]).default("auto"),
+  swap: z
+    .union([
+      z.preprocess((v) => parseInt(`${v}`, 10), z.number()),
+      z.literal("memory"),
+    ])
+    .default("memory"),
+  fs: z.string().default("btrfs"),
+});
+
+type Options = z.infer<typeof Options>;
+
 function install(options: {
-  template: (data: {
-    tz: string | "UTC";
-    lang: string | "en_US";
-    host: string | "arch";
-    cNtp: false | true;
-    keymap: false | string;
-    pScheme: false | "auto" | "gpt" | "mbr";
-    pSwap: false | true | number | "memory";
-    pFs: string | "btrfs";
-  }) => string;
+  template: (options: Options) => string;
   query: Record<string, string>;
 }): string {
   const { query, template } = options;
-  return template({
-    tz: (() => {
-      const value = query["tz"];
-      if (!value) {
-        if ("tz" in query) {
-          throw new Error("query.tz expected value");
-        }
-        return "UTC";
-      }
-      return value;
-    })(),
-    lang: (() => {
-      const value = query["lang"];
-      if (!value) {
-        if ("lang" in query) {
-          throw new Error("query.lang expected value");
-        }
-        return "en_US";
-      }
-      return value;
-    })(),
-    host: (() => {
-      const value = query["host"];
-      if (!value) {
-        if ("host" in query) {
-          throw new Error("query.host expected value");
-        }
-        return "arch";
-      }
-      return value;
-    })(),
-    cNtp: (() => {
-      const value = query["cNtp"];
-      if (!value) {
-        if ("cNtp" in query) {
-          return true;
-        }
-        return true;
-      } else if (value === "false" || value === "n") {
-        return false;
-      } else if (value === "true" || value === "y") {
-        return true;
-      }
-      throw new Error("query.cNtp invalid value");
-    })(),
-    keymap: (() => {
-      const value = query["keymap"];
-      if (!value) {
-        if ("keymap" in query) {
-          throw new Error("query.keymap expected value");
-        }
-        return false;
-      }
-      return value;
-    })(),
-    pScheme: (() => {
-      const value = query["pScheme"];
-      if (!value) {
-        if ("pScheme" in query) {
-          throw new Error("query.pScheme expected value");
-        }
-        return "auto";
-      } else if (value === "false" || value === "n") {
-        return false;
-      } else if (value === "auto" || value === "a") {
-        return "auto";
-      } else if (value === "gpt" || value === "g") {
-        return "gpt";
-      } else if (value === "mbr" || value === "m") {
-        return "mbr";
-      }
-      throw new Error("query.pScheme invalid value");
-    })(),
-    pSwap: (() => {
-      const value = query["pSwap"];
-      if (!value) {
-        if ("pSwap" in query) {
-          throw new Error("query.pSwap expected value");
-        }
-        return "memory";
-      } else if (value === "false" || value === "n") {
-        return false;
-      } else if (value === "true" || value === "y") {
-        return true;
-      } else if (value === "memory" || value === "m") {
-        return "memory";
-      }
-      const valueNumber = parseInt(value, 10);
-      if (Number.isNaN(valueNumber)) {
-        throw new Error("query.pSwap invalid number");
-      }
-      return valueNumber;
-    })(),
-    pFs: (() => {
-      const value = query["pFs"];
-      if (!value) {
-        if ("pFs" in query) {
-          throw new Error("query.pFs expected value");
-        }
-        return "btrfs";
-      }
-      return value;
-    })(),
-  });
+  const $ = Options.safeParse(query);
+  if (!$.success) {
+    return JSON.stringify($.error.format());
+  }
+  return template($.data);
 }
 
 const app = Express();

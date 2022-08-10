@@ -1,116 +1,119 @@
 #!/bin/env bash
 
 set -x
-
 set -e
 
-<% if (false) /* TODO: REMOVE */ { %>
-
-<% if (cNtp) { %>
+<% if (ntp) { %>
   # TODO: check that ntp is set true after reboot
   timedatectl set-ntp true
 <% } %>
 
-<% if (pScheme) { %>
-  <% if (pScheme === "auto") { %>
-    set +e
-    ls /sys/firmware/efi/efivars &> /dev/null
-    RESULT=$?
-    set -e
-    if [[ $RESULT -eq 0 ]]; then
-      DEV_SCHEME="gpt"
-    else
-      DEV_SCHEME="mbr"
-    fi
-  <% } else if (pScheme === "gpt") { %>
-    DEV_SCHEME="gpt"
-  <% } else if (pScheme === "mbr") { %>
-    DEV_SCHEME="mbr"
-  <% } %>
-
-  <% if (pSwap === true) { %>
-    DEV_SWAP_GB="1"
-  <% } else if (typeof pSwap === "number" && pSwap > 0) { %>
-    DEV_SWAP_GB="<%= pSwap %>"
-  <% } else if (pSwap === "memory") { %>
-    DEV_SWAP_GB="$(free --giga | grep Mem | awk '{ print $2 }')"
-  <% } %>
-
-  DEV="/dev/$(lsblk | grep disk | awk '{ print $1 }')"
-  if [[ -n "$(echo $DEV | grep nvme)" ]]; then
-    DEV_PRE="p"
+<% if (scheme === "auto") { %>
+  if [[ -d /sys/firmware/efi/efivars ]]; then
+    SCHEME="gpt"
   else
-    DEV_PRE=""
+    SCHEME="mbr"
   fi
-
-  if [[ "$DEV_SCHEME" == "gpt" ]]; then
-    (
-      echo g;
-      echo n; echo; echo; echo +300M;
-      <% if (pSwap) { %>
-        echo n; echo; echo; echo "+$(expr $DEV_SWAP_GB)G";
-      <% } %>
-      echo n; echo; echo; echo;
-      echo w;
-    ) | fdisk $DEV --wipe always --wipe-partitions always &>/dev/null
-
-    DEV_BOOT="${DEV}${DEV_PRE}1"
-    mkfs.fat -F 32 $DEV_BOOT
-
-    <% if (pSwap) { %>
-      DEV_SWAP="${DEV}${DEV_PRE}2"
-      mkswap $DEV_SWAP
-
-      DEV_ROOT="${DEV}${DEV_PRE}3"
-      mkfs.<%= pFs %> -f $DEV_ROOT
-    <% } else { %>
-      DEV_ROOT="${DEV}${DEV_PRE}2"
-      mkfs.<%= pFs %> -f $DEV_ROOT
-    <% } %>
-
-    mount --mkdir $DEV_ROOT /mnt
-    mount --mkdir $DEV_BOOT /mnt/boot
-    <% if (pSwap) { %>
-      swapon $DEV_SWAP
-    <% } %>
-
-  elif [[ "$DEV_SCHEME" == "mbr" ]]; then
-    (
-      echo o;
-      <% if (pSwap) { %>
-        echo n; echo; echo; echo; echo "+$(expr $DEV_SWAP_GB)G";
-      <% } %>
-      echo n; echo; echo; echo; echo;
-      echo w;
-    ) | fdisk $DEV --wipe always --wipe-partitions always &>/dev/null
-
-    <% if (pSwap) { %>
-      DEV_SWAP="${DEV}${DEV_PRE}1"
-      mkswap $DEV_SWAP
-
-      DEV_ROOT="${DEV}${DEV_PRE}2"
-      mkfs.<%= pFs %> -f $DEV_ROOT
-    <% } else { %>
-      DEV_ROOT="${DEV}${DEV_PRE}1"
-      mkfs.<%= pFs %> -f $DEV_ROOT
-    <% } %>
-
-    mount --mkdir $DEV_ROOT /mnt
-    <% if (pSwap) { %>
-      swapon $DEV_SWAP
-    <% } %>
-  fi
+<% } else if (scheme === "gpt") { %>
+  SCHEME="gpt"
+<% } else if (scheme === "mbr") { %>
+  SCHEME="mbr"
 <% } %>
+
+<% if (swap === "memory") { %>
+  SWAP_GB="$(free --giga | grep Mem | awk '{ print $2 }')"
+<% } else { %>
+  SWAP_GB="<%= swap %>"
+<% } %>
+
+DEV="/dev/$(lsblk | grep disk | awk '{ print $1 }')"
+if [[ -n "$(echo $DEV | grep nvme)" ]]; then
+  DEV_PRE="p"
+else
+  DEV_PRE=""
+fi
+
+if [[ "$SCHEME" == "gpt" ]]; then
+  (
+    echo g;
+    echo n; echo; echo; echo +300M;
+    <% if (swap) { %>
+      echo n; echo; echo; echo "+$(expr $SWAP_GB)G";
+    <% } %>
+    echo n; echo; echo; echo;
+    echo w;
+  ) | fdisk $DEV --wipe always --wipe-partitions always &>/dev/null
+
+  DEV_BOOT="${DEV}${DEV_PRE}1"
+  mkfs.fat -F 32 $DEV_BOOT
+
+  <% if (swap) { %>
+    DEV_SWAP="${DEV}${DEV_PRE}2"
+    mkswap $DEV_SWAP
+
+    DEV_ROOT="${DEV}${DEV_PRE}3"
+    mkfs.<%= fs %> -f $DEV_ROOT
+  <% } else { %>
+    DEV_ROOT="${DEV}${DEV_PRE}2"
+    mkfs.<%= fs %> -f $DEV_ROOT
+  <% } %>
+
+  mount --mkdir $DEV_ROOT /mnt
+  mount --mkdir $DEV_BOOT /mnt/boot
+  <% if (swap) { %>
+    swapon $DEV_SWAP
+  <% } %>
+
+elif [[ "$SCHEME" == "mbr" ]]; then
+  (
+    echo o;
+    <% if (swap) { %>
+      echo n; echo; echo; echo; echo "+$(expr $SWAP_GB)G";
+    <% } %>
+    echo n; echo; echo; echo; echo;
+    echo w;
+  ) | fdisk $DEV --wipe always --wipe-partitions always &>/dev/null
+
+  <% if (swap) { %>
+    DEV_SWAP="${DEV}${DEV_PRE}1"
+    mkswap $DEV_SWAP
+
+    DEV_ROOT="${DEV}${DEV_PRE}2"
+    mkfs.<%= fs %> -f $DEV_ROOT
+  <% } else { %>
+    DEV_ROOT="${DEV}${DEV_PRE}1"
+    mkfs.<%= fs %> -f $DEV_ROOT
+  <% } %>
+
+  mount --mkdir $DEV_ROOT /mnt
+  <% if (swap) { %>
+    swapon $DEV_SWAP
+  <% } %>
+fi
 
 reflector
 
 pacman -Sy --noconfirm archlinux-keyring
 
-pacstrap /mnt base base-devel linux linux-firmware grub efibootmgr
+UCODE_PACKAGE=""
+<% if (ucode === "auto") { %>
+  if [[ -n "$(lscpu | grep GenuineIntel)" ]]; then
+    UCODE_PACKAGE="intel-ucode"
+  elif [[ -n "$(lscpu | grep AuthenticAMD)" ]]; then
+    UCODE_PACKAGE="amd-ucode"
+  fi
+<% } else if (ucode === "intel") { %>
+  UCODE_PACKAGE="intel-ucode"
+<% } else if (ucode === "amd") { %>
+  UCODE_PACKAGE="amd-ucode"
+<% } %>
 
-<% } /* TODO: REMOVE */ %>
+pacstrap /mnt \
+  base base-devel \
+  linux linux-firmware $UCODE_PACKAGE \
+  grub efibootmgr
 
-genfstab -U /mnt >> /mnt/etc/fstab
+genfstab -U /mnt > /mnt/etc/fstab
 
 arch-chroot /mnt
 
@@ -128,4 +131,23 @@ echo "LANG=<%= lang %>.UTF-8" > /etc/locale.conf
 
 echo "<%= host %>" > /etc/hostname
 
+echo "127.0.0.1	localhost" >> /etc/hosts
+echo "::1		localhost" >> /etc/hosts
+echo "127.0.1.1	<%= host %>.localdomain	<%= host %>" >> /etc/hosts
 
+# TODO: get password from user input
+chpasswd <<< "root:password"
+
+if [[ "$SCHEME" == "gpt" ]]; then
+  grub-install --target $DEV
+elif [[ "$SCHEME" == "mbr" ]]; then
+  grub-install --target=i386-pc $DEV
+fi
+
+grub-mkconfig -o /boot/grub/grub.cfg
+
+useradd -mG wheel <%= user %>
+# TODO: get password from user input
+chpasswd <<< "<%= user %>:password"
+
+sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/g' /etc/sudoers
