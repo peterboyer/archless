@@ -137,9 +137,8 @@ fi
   <% } %>
 
   pacstrap /mnt \
-    base base-devel \
-    linux linux-firmware $UCODE_PACKAGE \
-    grub efibootmgr
+    base base-devel linux linux-firmware $UCODE_PACKAGE \
+    grub efibootmgr networkmanager sof-firmware
 <% } %>
 
 arch-chroot /mnt
@@ -161,6 +160,8 @@ echo "<%= host %>" > /etc/hostname
 echo "::1        localhost" >> /etc/hosts
 echo "127.0.0.1  localhost" >> /etc/hosts
 echo "127.0.1.1  <%= host %>.localdomain <%= host %>" >> /etc/hosts
+
+systemctl enable NetworkManager
 
 # TODO: get password from user input
 chpasswd <<< "root:password"
