@@ -172,6 +172,28 @@ useradd -mG wheel $oUSER
 chpasswd <<< "$oUSER:password"
 sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/g' /etc/sudoers
 
+# https://wiki.archlinux.org/title/Font_configuration#Fontconfig_configuration
+
+mkdir -p /home/$oUSER/.config/fontconfig
+cat << EOF > /home/$oUSER/.config/fontconfig/fonts.conf
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+<fontconfig>
+  <alias>
+    <family>monospace</family>
+    <prefer>
+      <family>JetBrains Mono</family>
+    </prefer>
+  </alias>
+</fontconfig>
+EOF
+
+# https://wiki.archlinux.org/title/Bspwm#Configuration
+
+install -Dm755 /usr/share/doc/bspwm/examples/bspwmrc /home/$oUSER/.config/bspwm/bspwmrc
+install -Dm644 /usr/share/doc/bspwm/examples/sxhkdrc /home/$oUSER/.config/sxhkd/sxhkdrc
+sed -i 's/urxvt/alacritty/g' /home/$oUSER/.config/sxhkd/sxhkdrc
+
 # https://wiki.archlinux.org/title/Xinit#Configuration
 
 cat << EOF > /home/$oUSER/.xinitrc
@@ -197,12 +219,6 @@ fi
 sxhkd &
 exec bspwm
 EOF
-
-# https://wiki.archlinux.org/title/Bspwm#Configuration
-
-install -Dm755 /usr/share/doc/bspwm/examples/bspwmrc /home/$oUSER/.config/bspwm/bspwmrc
-install -Dm644 /usr/share/doc/bspwm/examples/sxhkdrc /home/$oUSER/.config/sxhkd/sxhkdrc
-sed -i 's/urxvt/alacritty/g' /home/$oUSER/.config/sxhkd/sxhkdrc
 
 # https://wiki.archlinux.org/title/Xinit#Autostart_X_at_login
 
