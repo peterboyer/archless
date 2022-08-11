@@ -1,0 +1,7 @@
+{
+  "extends": "@tsconfig/node18-strictest",
+  "include": ["server.ts"],
+  "compilerOptions": {
+    "resolveJsonModule": true
+  }
+}
