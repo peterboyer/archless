@@ -20,9 +20,9 @@ export oKEYMAP=${oKEYMAP:-us}
 
 # https://wiki.archlinux.org/title/Installation_guide#Verify_the_boot_mode
 
-SCHEME="mbr"
+vSCHEME="mbr"
 if [[ -d /sys/firmware/efi/efivars ]]; then
-  SCHEME="gpt"
+  vSCHEME="gpt"
 fi
 
 # https://wiki.archlinux.org/title/Installation_guide#Update_the_system_clock
@@ -33,53 +33,53 @@ fi
 
 # https://wiki.archlinux.org/title/Installation_guide#Partition_the_disks
 
-DEV="/dev/$(lsblk | grep disk | awk '{ print $1 }')"
+vDEV="/dev/$(lsblk | grep disk | awk '{ print $1 }')"
 
 if [[ "$oSWAP" == "memory" ]]; then
   oSWAP="$(free --giga | grep Mem | awk '{ print $2 }')"
 fi
 
 (
-  if [[ "$SCHEME" == "mbr" ]]; then echo o; fi
-  if [[ "$SCHEME" == "gpt" ]]; then echo g; fi
+  if [[ "$vSCHEME" == "mbr" ]]; then echo o; fi
+  if [[ "$vSCHEME" == "gpt" ]]; then echo g; fi
 
-  if [[ "$SCHEME" == "gpt" ]]; then echo n; echo; echo; echo +300M; fi
+  if [[ "$vSCHEME" == "gpt" ]]; then echo n; echo; echo; echo +300M; fi
 
-  if [[ "$SCHEME" == "mbr" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo; echo +${oSWAP}G; fi
-  if [[ "$SCHEME" == "gpt" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo +${oSWAP}G; fi
+  if [[ "$vSCHEME" == "mbr" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo; echo +${oSWAP}G; fi
+  if [[ "$vSCHEME" == "gpt" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo +${oSWAP}G; fi
 
-  if [[ "$SCHEME" == "mbr" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo; echo; fi
-  if [[ "$SCHEME" == "gpt" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo; fi
+  if [[ "$vSCHEME" == "mbr" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo; echo; fi
+  if [[ "$vSCHEME" == "gpt" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo; fi
 
   echo w;
-) | fdisk $DEV --wipe always --wipe-partitions always &> /dev/null
+) | fdisk $vDEV --wipe always --wipe-partitions always &> /dev/null
 
 # https://wiki.archlinux.org/title/Installation_guide#Format_the_partitions
 
 INDEX=1
 PREFIX=""
-if [[ -n "$(echo $DEV | grep nvme)" ]]; then
+if [[ -n "$(echo $vDEV | grep nvme)" ]]; then
   PREFIX="p"
 fi
 
-if [[ "$SCHEME" == "gpt" ]]; then
-  DEV_BOOT="$DEV$PREFIX$INDEX"; INDEX=$((INDEX+1));
-  mkfs.fat -F 32 $DEV_BOOT
+if [[ "$vSCHEME" == "gpt" ]]; then
+  vDEV_BOOT="$vDEV$PREFIX$INDEX"; INDEX=$((INDEX+1));
+  mkfs.fat -F 32 $vDEV_BOOT
 fi
 
 if [[ "$oSWAP" != "0" ]]; then
-  DEV_SWAP="$DEV$PREFIX$INDEX"; INDEX=$((INDEX+1));
-  mkswap $DEV_SWAP
+  vDEV_SWAP="$vDEV$PREFIX$INDEX"; INDEX=$((INDEX+1));
+  mkswap $vDEV_SWAP
 fi
 
-DEV_ROOT="$DEV$PREFIX$INDEX"; INDEX=$((INDEX+1));
-mkfs.$oFS -f $DEV_ROOT
+vDEV_ROOT="$vDEV$PREFIX$INDEX"; INDEX=$((INDEX+1));
+mkfs.$oFS -f $vDEV_ROOT
 
 # https://wiki.archlinux.org/title/Installation_guide#Mount_the_file_systems
 
-mount --mkdir $DEV_ROOT /mnt
-if [[ "$SCHEME" == "gpt" ]]; then mount --mkdir $DEV_BOOT /mnt/boot; fi
-if [[ "$oSWAP" != "0" ]]; then swapon $DEV_SWAP; fi
+mount --mkdir $vDEV_ROOT /mnt
+if [[ "$vSCHEME" == "gpt" ]]; then mount --mkdir $vDEV_BOOT /mnt/boot; fi
+if [[ "$oSWAP" != "0" ]]; then swapon $vDEV_SWAP; fi
 
 # https://wiki.archlinux.org/title/Installation_guide#Fstab
 
@@ -118,8 +118,8 @@ yes | pacstrap /mnt \
 # https://wiki.archlinux.org/title/Installation_guide#Chroot
 
 env | grep -E '^o' > /mnt/env
-echo "DEV=$DEV" >> /mnt/env
-echo "SCHEME=$SCHEME" >> /mnt/env
+echo "vDEV=$vDEV" >> /mnt/env
+echo "vSCHEME=$vSCHEME" >> /mnt/env
 
 arch-chroot /mnt
 
@@ -151,8 +151,12 @@ systemctl enable NetworkManager
 
 # https://wiki.archlinux.org/title/Installation_guide#Boot_loader
 
-if [[ "$SCHEME" == "mbr" ]]; then grub-install --target=i386-pc $DEV; fi
-if [[ "$SCHEME" == "gpt" ]]; then grub-install --target $DEV; fi
+if [[ "$vSCHEME" == "mbr" ]]; then grub-install --target=i386-pc $vDEV; fi
+if [[ "$vSCHEME" == "gpt" ]]; then grub-install --target $vDEV; fi
+
+echo "GRUB_TIMEOUT=0" >> /etc/default/grub
+echo "GRUB_HIDDEN_TIMEOUT=0" >> /etc/default/grub
+echo "GRUB_HIDDEN_TIMEOUT_QUIET=true" >> /etc/default/grub
 
 grub-mkconfig -o /boot/grub/grub.cfg
 
