@@ -1,9 +1,7 @@
 #!/bin/env bash
 
 # TODO: set-ntp for new install (via. arch-chroot?)
-# TODO: remove duplication of scheme detection
 # TODO: get password from user input
-# TODO: remove duplication of DEV resolving
 
 set -x
 set -e
@@ -15,19 +13,19 @@ oSWAP=${oSWAP:-memory}
 oFS=${oFS:-btrfs}
 oUCODE=${oUCODE:-auto}
 oTZ=${oTZ:-UTC}
-oLANG=${oLANG:en_US}
-oHOST=${oHOST:arch}
-oUSER=${oUSER:admin}
-oKEYMAP=${oKEYMAP:us}
+oLANG=${oLANG:-en_US}
+oHOST=${oHOST:-arch}
+oUSER=${oUSER:-admin}
+oKEYMAP=${oKEYMAP:-us}
 
 # PARTITIONS
+
+DEV="/dev/$(lsblk | grep disk | awk '{ print $1 }')"
 
 SCHEME="mbr"
 if [[ -d /sys/firmware/efi/efivars ]]; then
   SCHEME="gpt"
 fi
-
-DEV="/dev/$(lsblk | grep disk | awk '{ print $1 }')"
 
 if [[ "$oSWAP" == "memory" ]]; then
   oSWAP="$(free --giga | grep Mem | awk '{ print $2 }')"
@@ -115,7 +113,18 @@ yes | pacstrap /mnt \
 
 # ROOT
 
+echo "export oTZ=$oTZ" >> /mnt/env
+echo "export oLANG=$oLANG" >> /mnt/env
+echo "export oKEYMAP=$oKEYMAP" >> /mnt/env
+echo "export oHOST=$oHOST" >> /mnt/env
+echo "export oUSER=$oUSER" >> /mnt/env
+
+echo "export DEV=$DEV" >> /mnt/env
+echo "export SCHEME=$SCHEME" >> /mnt/env
+
 arch-chroot /mnt
+
+source /env
 
 # CLOCK
 
@@ -146,13 +155,6 @@ echo "127.0.1.1  $oHOST.localdomain $oHOST" >> /etc/hosts
 systemctl enable NetworkManager
 
 # GRUB
-
-SCHEME="mbr"
-if [[ -d /sys/firmware/efi/efivars ]]; then
-  SCHEME="gpt"
-fi
-
-DEV="/dev/$(lsblk | grep disk | awk '{ print $1 }')"
 
 if [[ "$SCHEME" == "mbr" ]]; then grub-install --target=i386-pc $DEV; fi
 if [[ "$SCHEME" == "gpt" ]]; then grub-install --target $DEV; fi
