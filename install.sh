@@ -115,7 +115,7 @@ yes | pacstrap /mnt \
   base base-devel linux linux-firmware $UCODE \
   grub efibootmgr networkmanager sof-firmware \
   xorg xorg-xinit \
-  bspwm sxhkd alacritty ttf-jetbrains-mono
+  bspwm sxhkd dmenu alacritty ttf-jetbrains-mono
 
 # https://wiki.archlinux.org/title/Installation_guide#Chroot
 
