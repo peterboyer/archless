@@ -70,8 +70,6 @@ if [[ "$SCHEME" == "gpt" ]]; then
     <% if (swap) { %>
       swapon $DEV_SWAP
     <% } %>
-
-    genfstab -U /mnt > /mnt/etc/fstab
   <% } %>
 
 elif [[ "$SCHEME" == "mbr" ]]; then
@@ -108,8 +106,6 @@ elif [[ "$SCHEME" == "mbr" ]]; then
     <% if (swap) { %>
       swapon $DEV_SWAP
     <% } %>
-
-    genfstab -U /mnt > /mnt/etc/fstab
   <% } %>
 else
   echo panic: SCHEME invalid/not detected
@@ -140,6 +136,8 @@ fi
     base base-devel linux linux-firmware $UCODE_PACKAGE \
     grub efibootmgr networkmanager sof-firmware
 <% } %>
+
+genfstab -U /mnt > /mnt/etc/fstab
 
 arch-chroot /mnt
 
