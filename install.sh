@@ -8,7 +8,6 @@
 set -x
 set -e
 
-export oNTP=${oNTP:-true}
 export oSWAP=${oSWAP:-memory}
 export oFS=${oFS:-btrfs}
 export oUCODE=${oUCODE:-auto}
@@ -28,9 +27,7 @@ fi
 
 # https://wiki.archlinux.org/title/Installation_guide#Update_the_system_clock
 
-if [[ "$oNTP" == "true" ]]; then
-  timedatectl set-ntp true
-fi
+timedatectl set-ntp true
 
 # https://wiki.archlinux.org/title/Installation_guide#Partition_the_disks
 
