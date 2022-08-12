@@ -144,7 +144,7 @@ hwclock --systohc
 
 # https://wiki.archlinux.org/title/Installation_guide#Localization
 
-sed -i 's/#$oLANG.UTF-8/$oLANG.UTF-8/g' /etc/locale.gen
+sed -i "s/#$oLANG.UTF-8/$oLANG.UTF-8/g" /etc/locale.gen
 locale-gen
 echo "LANG=$oLANG.UTF-8" > /etc/locale.conf
 
