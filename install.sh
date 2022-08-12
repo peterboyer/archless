@@ -17,6 +17,7 @@ export oLANG=${oLANG:-en_US}
 export oHOST=${oHOST:-arch}
 export oUSER=${oUSER:-admin}
 export oKEYMAP=${oKEYMAP:-us}
+export oTERM=${oTEMP:-alacritty}
 
 # https://wiki.archlinux.org/title/Installation_guide#Verify_the_boot_mode
 
@@ -116,9 +117,9 @@ yes | pacstrap /mnt \
   grub efibootmgr \
   networkmanager \
   sof-firmware pulseaudio pulsemixer \
+  htop git \
   xorg xorg-xinit \
-  bspwm sxhkd dmenu alacritty ttf-jetbrains-mono \
-  git
+  bspwm sxhkd dmenu $oTERM ttf-jetbrains-mono
 
 # https://wiki.archlinux.org/title/Installation_guide#Chroot
 
@@ -201,7 +202,7 @@ EOF
 
 install -Dm755 /usr/share/doc/bspwm/examples/bspwmrc /home/$oUSER/.config/bspwm/bspwmrc
 install -Dm644 /usr/share/doc/bspwm/examples/sxhkdrc /home/$oUSER/.config/sxhkd/sxhkdrc
-sed -i 's/urxvt/alacritty/g' /home/$oUSER/.config/sxhkd/sxhkdrc
+sed -i 's/urxvt/$oTERM/g' /home/$oUSER/.config/sxhkd/sxhkdrc
 
 # https://wiki.archlinux.org/title/Xinit#Configuration
 
