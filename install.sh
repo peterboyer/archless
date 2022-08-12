@@ -130,6 +130,12 @@ arch-chroot /mnt
 
 source /env
 
+# https://github.com/Jguer/yay
+
+mkdir -p /home/$oUSER/.packages
+git clone https://aur.archlinux.org/yay-bin.git
+(cd /home/$oUSER/.packages/yay-bin && makepkg -si)
+
 # https://wiki.archlinux.org/title/Installation_guide#Time_zone
 
 ln -sf /usr/share/zoneinfo/$oTZ /etc/localtime
