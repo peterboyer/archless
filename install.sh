@@ -113,9 +113,12 @@ fi
 
 yes | pacstrap /mnt \
   base base-devel linux linux-firmware $UCODE \
-  grub efibootmgr networkmanager sof-firmware \
+  grub efibootmgr \
+  networkmanager \
+  sof-firmware pulseaudio pulsemixer \
   xorg xorg-xinit \
-  bspwm sxhkd dmenu alacritty ttf-jetbrains-mono
+  bspwm sxhkd dmenu alacritty ttf-jetbrains-mono \
+  git
 
 # https://wiki.archlinux.org/title/Installation_guide#Chroot
 
