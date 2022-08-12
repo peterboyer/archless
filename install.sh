@@ -115,8 +115,9 @@ yes | pacstrap /mnt \
   networkmanager \
   sof-firmware pulseaudio pulsemixer \
   htop git \
-  xorg xorg-xinit \
-  bspwm sxhkd dmenu $oTERM ttf-jetbrains-mono
+  xorg xorg-xinit xwallpaper \
+  $oTERM ttf-jetbrains-mono \
+  bspwm sxhkd dmenu polybar
 
 # https://wiki.archlinux.org/title/Installation_guide#Chroot
 
@@ -136,16 +137,22 @@ git clone https://aur.archlinux.org/yay-bin.git
 
 # https://wiki.archlinux.org/title/Installation_guide#Time_zone
 
+# TODO: verify that this actually persists ntp config into new install
+timedatectl set-ntp true
+
 ln -sf /usr/share/zoneinfo/$oTZ /etc/localtime
 hwclock --systohc
+
+# https://wiki.archlinux.org/title/Installation_guide#Set_the_console_keyboard_layout
+
+loadkeys $oKEYMAP
 
 # https://wiki.archlinux.org/title/Installation_guide#Localization
 
 sed -i "s/#$oLANG.UTF-8/$oLANG.UTF-8/g" /etc/locale.gen
 locale-gen
-echo "LANG=$oLANG.UTF-8" > /etc/locale.conf
 
-loadkeys $oKEYMAP
+echo "LANG=$oLANG.UTF-8" > /etc/locale.conf
 echo "KEYMAP=$oKEYMAP" > /etc/vconsole.conf
 
 # https://wiki.archlinux.org/title/Installation_guide#Network_configuration
@@ -201,6 +208,19 @@ install -Dm755 /usr/share/doc/bspwm/examples/bspwmrc /home/$oUSER/.config/bspwm/
 install -Dm644 /usr/share/doc/bspwm/examples/sxhkdrc /home/$oUSER/.config/sxhkd/sxhkdrc
 sed -i 's/urxvt/$oTERM/g' /home/$oUSER/.config/sxhkd/sxhkdrc
 
+# https://wiki.archlinux.org/title/Polybar#Running_with_a_window_manager
+
+mkdir -p /home/$oUSER/.config/polybar
+
+cat << EOF > /home/$oUSER/.config/polybar/launch.sh
+#!/bin/bash
+
+killall -q polybar
+polybar 2>&1 | tee -a /tmp/polybar.log & disown
+EOF
+
+echo "\$HOME/.config/polybar/launch.sh" >> /home/$oUSER/.config/bspwm/bspwmrc
+
 # https://wiki.archlinux.org/title/Xinit#Configuration
 
 cat << EOF > /home/$oUSER/.xinitrc
@@ -224,6 +244,7 @@ if [ -d /etc/X11/xinit/xinitrc.d ] ; then
 fi
 
 sxhkd &
+xwallpaper --zoom ~/wallpaper.*
 exec bspwm
 EOF
 
@@ -233,4 +254,13 @@ cat << EOF >> /home/$oUSER/.bash_profile
 if [ -z "\$DISPLAY" ] && [ "\$XDG_VTNR" -eq 1 ]; then
   exec startx
 fi
+EOF
+
+# https://wiki.archlinux.org/title/Getty#Prompt_only_the_password_for_a_default_user_in_virtual_console_login
+
+mkdir -p /etc/systemd/system/getty@tty1.service.d
+cat << EOF > /etc/systemd/system/getty@tty1.service.d/skip-username.conf
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty -o '-p -- $oUSER' --noclear --skip-login - $TERM
 EOF
