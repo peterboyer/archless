@@ -33,5 +33,20 @@ mkdir -p ~/.config
 
 (
   cd ~/.config;
-  ln -fs ../.dotfiles/.config/fontconfig;
+  ln -fs ../.dotfiles/config/fontconfig;
+)
+
+# https://wiki.archlinux.org/title/Bspwm#Configuration
+
+(
+  cd ~/.config;
+  ln -fs ../.dotfiles/config/bspwm;
+  ln -fs ../.dotfiles/config/sxhkd;
+)
+
+# https://wiki.archlinux.org/title/Polybar#Running_with_a_window_manager
+
+(
+  cd ~/.config;
+  ln -fs ../.dotfiles/config/polybar;
 )
