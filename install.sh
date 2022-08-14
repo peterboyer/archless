@@ -2,8 +2,6 @@
 
 # TODO: source options from github user repo .archlessrc file
 # TODO: include user packages also in pacstrap step
-# TODO: set-ntp for new install (via. arch-chroot?)
-# TODO: get password from user input
 
 set -x
 set -e
@@ -129,12 +127,6 @@ arch-chroot /mnt
 
 source /env
 
-# https://github.com/Jguer/yay
-
-mkdir -p /home/$oUSER/.packages
-git clone https://aur.archlinux.org/yay-bin.git
-(cd /home/$oUSER/.packages/yay-bin && makepkg -si)
-
 # https://wiki.archlinux.org/title/Installation_guide#Time_zone
 
 # TODO: verify that this actually persists ntp config into new install
@@ -184,12 +176,36 @@ chpasswd <<< "root:password"
 
 useradd -mG wheel $oUSER
 chpasswd <<< "$oUSER:password"
-sed -i 's/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/g' /etc/sudoers
+sed -i "s/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/g" /etc/sudoers
+sed -i "s/# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/%wheel ALL=(ALL:ALL) NOPASSWD: ALL/g" /etc/sudoers
+
+# https://wiki.archlinux.org/title/Getty#Prompt_only_the_password_for_a_default_user_in_virtual_console_login
+
+mkdir -p /etc/systemd/system/getty@tty1.service.d
+cat << EOF > /etc/systemd/system/getty@tty1.service.d/skip-username.conf
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty -o '-p -- $oUSER' --noclear --skip-login - \$TERM
+EOF
+
+# switch
+
+su $oUSER
+
+# https://github.com/Jguer/yay
+
+mkdir -p $HOME/.packages;
+(
+  cd $HOME/.packages;
+  git clone https://aur.archlinux.org/yay-bin.git;
+  cd yay-bin;
+  yes | makepkg -si --noconfirm;
+)
 
 # https://wiki.archlinux.org/title/Font_configuration#Fontconfig_configuration
 
-mkdir -p /home/$oUSER/.config/fontconfig
-cat << EOF > /home/$oUSER/.config/fontconfig/fonts.conf
+mkdir -p $HOME/.config/fontconfig
+cat << EOF > $HOME/.config/fontconfig/fonts.conf
 <?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
 <fontconfig>
@@ -204,26 +220,26 @@ EOF
 
 # https://wiki.archlinux.org/title/Bspwm#Configuration
 
-install -Dm755 /usr/share/doc/bspwm/examples/bspwmrc /home/$oUSER/.config/bspwm/bspwmrc
-install -Dm644 /usr/share/doc/bspwm/examples/sxhkdrc /home/$oUSER/.config/sxhkd/sxhkdrc
-sed -i 's/urxvt/$oTERM/g' /home/$oUSER/.config/sxhkd/sxhkdrc
+install -Dm755 /usr/share/doc/bspwm/examples/bspwmrc $HOME/.config/bspwm/bspwmrc
+install -Dm644 /usr/share/doc/bspwm/examples/sxhkdrc $HOME/.config/sxhkd/sxhkdrc
+sed -i "s/urxvt/$oTERM/g" $HOME/.config/sxhkd/sxhkdrc
 
 # https://wiki.archlinux.org/title/Polybar#Running_with_a_window_manager
 
-mkdir -p /home/$oUSER/.config/polybar
+mkdir -p $HOME/.config/polybar
 
-cat << EOF > /home/$oUSER/.config/polybar/launch.sh
+cat << EOF > $HOME/.config/polybar/launch.sh
 #!/bin/bash
 
 killall -q polybar
 polybar 2>&1 | tee -a /tmp/polybar.log & disown
 EOF
 
-echo "\$HOME/.config/polybar/launch.sh" >> /home/$oUSER/.config/bspwm/bspwmrc
+echo "\$HOME/.config/polybar/launch.sh" >> $HOME/.config/bspwm/bspwmrc
 
 # https://wiki.archlinux.org/title/Xinit#Configuration
 
-cat << EOF > /home/$oUSER/.xinitrc
+cat << EOF > $HOME/.xinitrc
 #!/bin/sh
 
 userresources=\$HOME/.Xresources
@@ -250,17 +266,16 @@ EOF
 
 # https://wiki.archlinux.org/title/Xinit#Autostart_X_at_login
 
-cat << EOF >> /home/$oUSER/.bash_profile
+cat << EOF >> $HOME/.bash_profile
 if [ -z "\$DISPLAY" ] && [ "\$XDG_VTNR" -eq 1 ]; then
   exec startx
 fi
 EOF
 
-# https://wiki.archlinux.org/title/Getty#Prompt_only_the_password_for_a_default_user_in_virtual_console_login
+# root
 
-mkdir -p /etc/systemd/system/getty@tty1.service.d
-cat << EOF > /etc/systemd/system/getty@tty1.service.d/skip-username.conf
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty -o '-p -- $oUSER' --noclear --skip-login - $TERM
-EOF
+exit # from su
+
+# disable nopasswd
+
+sed -i "s/%wheel ALL=(ALL:ALL) NOPASSWD: ALL/# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/g" /etc/sudoers
