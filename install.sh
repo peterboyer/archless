@@ -1,20 +1,16 @@
 #!/bin/env bash
 
-# TODO: source options from github user repo .archlessrc file
-# TODO: include user packages also in pacstrap step
-
 set -x
 set -e
 
-export oSWAP=${oSWAP:-memory}
-export oFS=${oFS:-btrfs}
-export oUCODE=${oUCODE:-auto}
-export oTZ=${oTZ:-UTC}
-export oLANG=${oLANG:-en_US}
 export oHOST=${oHOST:-arch}
 export oUSER=${oUSER:-admin}
+export oTZ=${oTZ:-UTC}
+export oLANG=${oLANG:-en_US}
 export oKEYMAP=${oKEYMAP:-us}
-export oTERM=${oTEMP:-alacritty}
+export oFS=${oFS:-btrfs}
+export oSWAP=${oSWAP:-memory}
+export oUCODE=${oUCODE:-auto}
 
 # https://wiki.archlinux.org/title/Installation_guide#Verify_the_boot_mode
 
@@ -111,11 +107,8 @@ yes | pacstrap /mnt \
   base base-devel linux linux-firmware $UCODE \
   grub efibootmgr \
   networkmanager \
-  sof-firmware pulseaudio pulsemixer \
-  htop git \
-  xorg xorg-xinit xwallpaper \
-  $oTERM ttf-jetbrains-mono \
-  bspwm sxhkd dmenu polybar
+  sof-firmware \
+  git
 
 # https://wiki.archlinux.org/title/Installation_guide#Chroot
 
@@ -157,17 +150,6 @@ echo "127.0.1.1  $oHOST.localdomain $oHOST" >> /etc/hosts
 
 systemctl enable NetworkManager
 
-# https://wiki.archlinux.org/title/Installation_guide#Boot_loader
-
-if [[ "$vSCHEME" == "mbr" ]]; then grub-install --target=i386-pc $vDEV; fi
-if [[ "$vSCHEME" == "gpt" ]]; then grub-install --target $vDEV; fi
-
-echo "GRUB_TIMEOUT=0" >> /etc/default/grub
-echo "GRUB_HIDDEN_TIMEOUT=0" >> /etc/default/grub
-echo "GRUB_HIDDEN_TIMEOUT_QUIET=true" >> /etc/default/grub
-
-grub-mkconfig -o /boot/grub/grub.cfg
-
 # https://wiki.archlinux.org/title/Installation_guide#Root_password
 
 chpasswd <<< "root:password"
@@ -177,46 +159,33 @@ chpasswd <<< "root:password"
 useradd -mG wheel $oUSER
 chpasswd <<< "$oUSER:password"
 sed -i "s/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/g" /etc/sudoers
-sed -i "s/# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/%wheel ALL=(ALL:ALL) NOPASSWD: ALL/g" /etc/sudoers
 
-# https://wiki.archlinux.org/title/Getty#Prompt_only_the_password_for_a_default_user_in_virtual_console_login
+# https://wiki.archlinux.org/title/Installation_guide#Boot_loader
 
-mkdir -p /etc/systemd/system/getty@tty1.service.d
-cat << EOF > /etc/systemd/system/getty@tty1.service.d/skip-username.conf
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty -o '-p -- $oUSER' --noclear --skip-login - \$TERM
-EOF
+if [[ "$vSCHEME" == "mbr" ]]; then grub-install --target=i386-pc $vDEV; fi
+if [[ "$vSCHEME" == "gpt" ]]; then grub-install --target $vDEV; fi
+
+grub-mkconfig -o /boot/grub/grub.cfg
+
+# dotfiles
+
+(
+  su $oUSER;
+  git clone $oDOTFILES $HOME/.dotfiles;
+)
+
+(
+  cd /home/$oUSER/.dotfiles;
+  chmod +x sudo.sh;
+  ./sudo.sh;
+)
 
 # switch
 
+# temp enable (disable below)
+sed -i "s/# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/%wheel ALL=(ALL:ALL) NOPASSWD: ALL/g" /etc/sudoers
+
 su $oUSER
-
-# https://github.com/Jguer/yay
-
-mkdir -p $HOME/.packages;
-(
-  cd $HOME/.packages;
-  git clone https://aur.archlinux.org/yay-bin.git;
-  cd yay-bin;
-  yes | makepkg -si --noconfirm;
-)
-
-# https://wiki.archlinux.org/title/Font_configuration#Fontconfig_configuration
-
-mkdir -p $HOME/.config/fontconfig
-cat << EOF > $HOME/.config/fontconfig/fonts.conf
-<?xml version="1.0"?>
-<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
-<fontconfig>
-  <alias>
-    <family>monospace</family>
-    <prefer>
-      <family>JetBrains Mono</family>
-    </prefer>
-  </alias>
-</fontconfig>
-EOF
 
 # https://wiki.archlinux.org/title/Bspwm#Configuration
 
@@ -275,6 +244,10 @@ EOF
 # root
 
 exit # from su
+
+# cleanup /env
+
+rm /env
 
 # disable nopasswd
 

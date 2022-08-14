@@ -1,0 +1,12 @@
+export oTZ=Australia/Sydney
+export oLANG=en_AU
+export oYAY=true
+export oPACKAGES=(
+  htop
+  pulseaudio pulsemixer
+
+  neovim
+)
+export oPLUGINS=(
+  "fonts"
+)
