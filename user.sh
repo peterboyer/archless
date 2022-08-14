@@ -25,18 +25,13 @@ if [[ "$(which yay; echo $?);" != "0" ]]; then
   )
 fi
 
+# ensure .config dir
+
+mkdir -p ~/.config
+
 # https://wiki.archlinux.org/title/Font_configuration#Fontconfig_configuration
 
-mkdir -p $HOME/.config/fontconfig
-cat << EOF > $HOME/.config/fontconfig/fonts.conf
-<?xml version="1.0"?>
-<!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
-<fontconfig>
-  <alias>
-    <family>monospace</family>
-    <prefer>
-      <family>JetBrains Mono</family>
-    </prefer>
-  </alias>
-</fontconfig>
-EOF
+(
+  cd ~/.config;
+  ln -fs ../.dotfiles/.config/fontconfig;
+)
