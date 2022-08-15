@@ -1,6 +1,6 @@
 # https://github.com/Jguer/yay
 
-if [[ "$(which yay; echo $?);" != "0" ]]; then
+if [[ "$(which yay &> /dev/null; echo $?)" != "0" ]]; then
   (
     cd $HOME;
     git clone https://aur.archlinux.org/yay-bin.git;
@@ -14,6 +14,7 @@ fi
 
 PACKAGES=(
   htop
+  neovim
   pulseaudio
   pulsemixer
   xorg
@@ -59,12 +60,12 @@ mkdir -p ~/.config
 
 (
   cd ~;
-  ln -fs ../.dotfiles/config/xinit .xinitrc;
+  ln -fs ./.dotfiles/config/xinit .xinitrc;
 )
 
 # https://wiki.archlinux.org/title/Xinit#Autostart_X_at_login
 
 (
   cd ~;
-  ln -fs ../.dotfiles/config/bash_profile .bash_profile;
+  ln -fs ./.dotfiles/config/bash_profile .bash_profile;
 )
