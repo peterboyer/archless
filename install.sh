@@ -104,7 +104,8 @@ fi
 # https://wiki.archlinux.org/title/Installation_guide#Install_essential_packages
 
 yes | pacstrap /mnt \
-  base base-devel linux linux-firmware $UCODE \
+  base base-devel \
+  linux linux-firmware $UCODE \
   grub efibootmgr \
   networkmanager \
   sof-firmware \
@@ -174,76 +175,30 @@ grub-mkconfig -o /boot/grub/grub.cfg
   git clone $oDOTFILES $HOME/.dotfiles;
 )
 
+# sudo.sh
+
 (
   cd /home/$oUSER/.dotfiles;
-  chmod +x sudo.sh;
   ./sudo.sh;
 )
-
-# switch
 
 # temp enable (disable below)
 sed -i "s/# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/%wheel ALL=(ALL:ALL) NOPASSWD: ALL/g" /etc/sudoers
 
+# switch
+
 su $oUSER
 
-# https://wiki.archlinux.org/title/Bspwm#Configuration
+# user.sh
 
-install -Dm755 /usr/share/doc/bspwm/examples/bspwmrc $HOME/.config/bspwm/bspwmrc
-install -Dm644 /usr/share/doc/bspwm/examples/sxhkdrc $HOME/.config/sxhkd/sxhkdrc
-sed -i "s/urxvt/$oTERM/g" $HOME/.config/sxhkd/sxhkdrc
-
-# https://wiki.archlinux.org/title/Polybar#Running_with_a_window_manager
-
-mkdir -p $HOME/.config/polybar
-
-cat << EOF > $HOME/.config/polybar/launch.sh
-#!/bin/bash
-
-killall -q polybar
-polybar 2>&1 | tee -a /tmp/polybar.log & disown
-EOF
-
-echo "\$HOME/.config/polybar/launch.sh" >> $HOME/.config/bspwm/bspwmrc
-
-# https://wiki.archlinux.org/title/Xinit#Configuration
-
-cat << EOF > $HOME/.xinitrc
-#!/bin/sh
-
-userresources=\$HOME/.Xresources
-usermodmap=\$HOME/.Xmodmap
-sysresources=/etc/X11/xinit/.Xresources
-sysmodmap=/etc/X11/xinit/.Xmodmap
-
-if [ -f "\$sysresources" ]; then xrdb -merge "\$sysresources"; fi
-if [ -f "\$sysmodmap" ]; then xmodmap "\$sysmodmap"; fi
-if [ -f "\$userresources" ]; then xrdb -merge "\$userresources"; fi
-if [ -f "\$usermodmap" ]; then xmodmap "\$usermodmap"; fi
-
-if [ -d /etc/X11/xinit/xinitrc.d ] ; then
- for f in /etc/X11/xinit/xinitrc.d/?*.sh ; do
-  [ -x "\$f" ] && . "\$f"
- done
- unset f
-fi
-
-sxhkd &
-xwallpaper --zoom ~/wallpaper.*
-exec bspwm
-EOF
-
-# https://wiki.archlinux.org/title/Xinit#Autostart_X_at_login
-
-cat << EOF >> $HOME/.bash_profile
-if [ -z "\$DISPLAY" ] && [ "\$XDG_VTNR" -eq 1 ]; then
-  exec startx
-fi
-EOF
+(
+  cd /home/$oUSER/.dotfiles;
+  ./user.sh;
+)
 
 # root
 
-exit # from su
+exit
 
 # cleanup /env
 

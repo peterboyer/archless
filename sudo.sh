@@ -1,4 +1,4 @@
-# grub
+# https://wiki.archlinux.org/title/GRUB#Configuration
 
 (
   cd /etc/default;
