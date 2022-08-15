@@ -45,16 +45,16 @@ $ export oLANG="en_AU"
 [Config](#config))
 
 ```bash
-$ export oSRC="<GH_USER>"
+$ export PROFILE="<GH_USER>"
 # from: https://raw.githubusercontent.com/<GH_USER>/dotfiles/main/archlessrc
 
-$ export oSRC="<GH_USER>/<GH_REPO>"
+$ export PROFILE="<GH_USER>/<GH_REPO>"
 # from: https://raw.githubusercontent.com/<GH_USER>/<GH_REPO>/main/archlessrc
 
-$ export oSRC="<GH_USER>/<GH_REPO>/<FILE>"
+$ export PROFILE="<GH_USER>/<GH_REPO>/<FILE>"
 # from: https://raw.githubusercontent.com/<GH_USER>/<GH_REPO>/main/<FILE>
 
-$ export oSRC="<CUSTOM_URL>"
+$ export PROFILE="<CUSTOM_URL>"
 # from: <CUSTOM_URL>
 ```
 
