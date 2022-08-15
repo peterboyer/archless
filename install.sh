@@ -3,21 +3,122 @@
 set -x
 set -e
 
+# if set, will load script that exports options for install
+#   - <USER> --> resolve to raw.githubusercontent.com/<USER>/dotfiles/main/archless
+#   - <USER>/<REPO> --> resolve to raw.githubusercontent.com/<USER>/<REPO>/main/archless
+#   - otherwise, use as-is (can be any url)
+export oPROFILE=${oPROFILE:-$PROFILE}
+
+# if set, will git clone from given http[s]://.../*.git repo and execute scripts[1]
+#   - <USER> --> resolve to https://github.com/<USER>/dotfiles.git
+#   - <USER>/<REPO> --> resolve to https://github.com/<USER>/<REPO>.git
+#   - otherwise, use as-is (can be any url)
+# [1] scripts:
+#   - /sudo.sh (any root system changes as root user)
+#   - /user.sh (any changes as non-root user)
+export oDOTFILES=${oDOTFILES:-"*"}
+
+# name of machine (for /etc/hostname and /etc/hosts)
 export oHOST=${oHOST:-arch}
+
+# name of non-root user
 export oUSER=${oUSER:-admin}
+
+# timezone from available /zoneinfo/**/* to be linked to /etc/localtime
 export oTZ=${oTZ:-UTC}
+
+# language from available /etc/locale.gen
 export oLANG=${oLANG:-en_US}
+
+# keymap from available keymaps/**/* to be loaded via loadkeys
 export oKEYMAP=${oKEYMAP:-us}
+
+# filesystem to use for root partition, as with mkfs.*
 export oFS=${oFS:-btrfs}
+
+# size of swap partition
+#   - 0 --> no swap partition
+#   - 1..n --> 1..n GB sized partition
+#   - memory --> use size of available memory as size of swap
 export oSWAP=${oSWAP:-memory}
+
+# install ucode package when doing pacstrap
+#   - auto --> automatically determine intel or amd from lscpu output
+#   - intel/amd --> force specific ucode package
+#   - none --> skip
 export oUCODE=${oUCODE:-auto}
+
+# set partition scheme
+#   - auto --> automatically determine from boot mode via ../efivars dir
+#   - mbr/gpt --> force specific partiton scheme
+export oSCHEME=${oSCHEME:-auto}
+
+# profile/dotfiles
+
+zPROFILE=$oPROFILE
+if [[ -n "$oPROFILE" ]]; then
+  if [[ "$oPROFILE" =~ ^[a-zA-Z]+$ ]]; then
+    oPROFILE="https://raw.githubusercontent.com/$oPROFILE/dotfiles/main/archless"
+  elif [[ "$oPROFILE" =~ ^[a-zA-Z]+\/[.a-zA-Z]+$ ]]; then
+    oPROFILE="https://raw.githubusercontent.com/$oPROFILE/main/archless"
+  fi
+  curl "$oPROFILE" -o /profile
+  source /profile
+  rm /profile
+fi
+
+if [[ "$oDOTFILES" == "*" ]]; then
+  oDOTFILES=$zPROFILE;
+fi
+
+if [[ -n "$oDOTFILES" ]]; then
+  if [[ "$oDOTFILES" =~ ^[a-zA-Z]+$ ]]; then
+    oDOTFILES="https://github.com/$oDOTFILES/dotfiles.git"
+  elif [[ "$DOTFILES" =~ ^[a-zA-Z]+\/[.a-zA-Z]+$ ]]; then
+    oDOTFILES="https://github.com/$oDOTFILES.git"
+  fi
+fi
+
+# devices
+
+vDEV="/dev/$(lsblk | grep disk | awk '{ print $1 }')"
 
 # https://wiki.archlinux.org/title/Installation_guide#Verify_the_boot_mode
 
-vSCHEME="mbr"
-if [[ -d /sys/firmware/efi/efivars ]]; then
-  vSCHEME="gpt"
+if [[ "$oSCHEME" == "auto" ]]; then
+  oSCHEME="mbr"
+  if [[ -d /sys/firmware/efi/efivars ]]; then
+    oSCHEME="gpt"
+  fi
 fi
+
+# swap
+
+if [[ "$oSWAP" == "memory" ]]; then
+  oSWAP="$(free --giga | grep Mem | awk '{ print $2 }')"
+fi
+
+# partitions
+
+INDEX=1; next() { INDEX=$((INDEX+1)); }
+PREFIX=""
+if [[ -n "$(echo $vDEV | grep nvme)" ]]; then PREFIX="p"; fi
+
+if [[ "$oSCHEME" == "gpt" ]]; then vDEV_BOOT="$vDEV$PREFIX$INDEX"; next; fi
+if [[ "$oSWAP" != "0" ]]; then vDEV_SWAP="$vDEV$PREFIX$INDEX"; next; fi
+vDEV_ROOT="$vDEV$PREFIX$INDEX"; next;
+
+# microcode
+
+if [[ "$oUCODE" == "auto" ]]; then
+  if [[ -n "$(lscpu | grep GenuineIntel)" ]]; then
+    oUCODE="intel"
+  elif [[ -n "$(lscpu | grep AuthenticAMD)" ]]; then
+    oUCODE="amd"
+  fi
+fi
+
+env | grep -E '^o'
 
 # https://wiki.archlinux.org/title/Installation_guide#Update_the_system_clock
 
@@ -25,53 +126,32 @@ timedatectl set-ntp true
 
 # https://wiki.archlinux.org/title/Installation_guide#Partition_the_disks
 
-vDEV="/dev/$(lsblk | grep disk | awk '{ print $1 }')"
-
-if [[ "$oSWAP" == "memory" ]]; then
-  oSWAP="$(free --giga | grep Mem | awk '{ print $2 }')"
-fi
-
 (
-  if [[ "$vSCHEME" == "mbr" ]]; then echo o; fi
-  if [[ "$vSCHEME" == "gpt" ]]; then echo g; fi
+  if [[ "$oSCHEME" == "mbr" ]]; then echo o; fi
+  if [[ "$oSCHEME" == "gpt" ]]; then echo g; fi
 
-  if [[ "$vSCHEME" == "gpt" ]]; then echo n; echo; echo; echo +300M; fi
+  if [[ "$oSCHEME" == "gpt" ]]; then echo n; echo; echo; echo +300M; fi
 
-  if [[ "$vSCHEME" == "mbr" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo; echo +${oSWAP}G; fi
-  if [[ "$vSCHEME" == "gpt" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo +${oSWAP}G; fi
+  if [[ "$oSCHEME" == "mbr" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo; echo +${oSWAP}G; fi
+  if [[ "$oSCHEME" == "gpt" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo +${oSWAP}G; fi
 
-  if [[ "$vSCHEME" == "mbr" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo; echo; fi
-  if [[ "$vSCHEME" == "gpt" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo; fi
+  if [[ "$oSCHEME" == "mbr" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo; echo; fi
+  if [[ "$oSCHEME" == "gpt" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo; fi
 
   echo w;
 ) | fdisk $vDEV --wipe always --wipe-partitions always &> /dev/null
 
 # https://wiki.archlinux.org/title/Installation_guide#Format_the_partitions
 
-INDEX=1
-PREFIX=""
-if [[ -n "$(echo $vDEV | grep nvme)" ]]; then
-  PREFIX="p"
-fi
-
-if [[ "$vSCHEME" == "gpt" ]]; then
-  vDEV_BOOT="$vDEV$PREFIX$INDEX"; INDEX=$((INDEX+1));
-  mkfs.fat -F 32 $vDEV_BOOT
-fi
-
-if [[ "$oSWAP" != "0" ]]; then
-  vDEV_SWAP="$vDEV$PREFIX$INDEX"; INDEX=$((INDEX+1));
-  mkswap $vDEV_SWAP
-fi
-
-vDEV_ROOT="$vDEV$PREFIX$INDEX"; INDEX=$((INDEX+1));
+if [[ -n "$vDEV_BOOT" ]]; then mkfs.fat -F 32 $vDEV_BOOT; fi
+if [[ -n "$vDEV_SWAP" ]]; then mkswap $vDEV_SWAP; fi
 mkfs.$oFS -f $vDEV_ROOT
 
 # https://wiki.archlinux.org/title/Installation_guide#Mount_the_file_systems
 
 mount --mkdir $vDEV_ROOT /mnt
-if [[ "$vSCHEME" == "gpt" ]]; then mount --mkdir $vDEV_BOOT /mnt/boot; fi
-if [[ "$oSWAP" != "0" ]]; then swapon $vDEV_SWAP; fi
+if [[ -n "$vDEV_BOOT" ]]; then mount --mkdir $vDEV_BOOT /mnt/boot; fi
+if [[ -n "$vDEV_SWAP" ]]; then swapon $vDEV_SWAP; fi
 
 # https://wiki.archlinux.org/title/Installation_guide#Fstab
 
@@ -86,22 +166,12 @@ yes | pacman -Sy --noconfirm archlinux-keyring
 
 reflector || true
 
-# https://wiki.archlinux.org/title/Microcode#Installation
+# https://wiki.archlinux.org/title/Installation_guide#Install_essential_packages
 
 UCODE=""
-if [[ "$oUCODE" == "auto" ]]; then
-  if [[ -n "$(lscpu | grep GenuineIntel)" ]]; then
-    UCODE="intel-ucode"
-  elif [[ -n "$(lscpu | grep AuthenticAMD)" ]]; then
-    UCODE="amd-ucode"
-  fi
-elif [[ "$oUCODE" == "intel" ]]; then
-  UCODE="intel-ucode"
-elif [[ "$oUCODE" == "amd" ]]; then
-  UCODE="amd-ucode"
+if [[ "$oUCODE" == "intel" || "$oUCODE" == "amd" ]]; then
+  UCODE="$oUCODE-ucode"
 fi
-
-# https://wiki.archlinux.org/title/Installation_guide#Install_essential_packages
 
 yes | pacstrap /mnt \
   base base-devel \
@@ -115,7 +185,8 @@ yes | pacstrap /mnt \
 
 env | grep -E '^o' > /mnt/env
 echo "vDEV=$vDEV" >> /mnt/env
-echo "vSCHEME=$vSCHEME" >> /mnt/env
+
+# chroot
 
 arch-chroot /mnt
 
@@ -163,8 +234,8 @@ sed -i "s/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/g" /etc/sudoers
 
 # https://wiki.archlinux.org/title/Installation_guide#Boot_loader
 
-if [[ "$vSCHEME" == "mbr" ]]; then grub-install --target=i386-pc $vDEV; fi
-if [[ "$vSCHEME" == "gpt" ]]; then grub-install --target $vDEV; fi
+if [[ "$oSCHEME" == "mbr" ]]; then grub-install --target=i386-pc $vDEV; fi
+if [[ "$oSCHEME" == "gpt" ]]; then grub-install --target $vDEV; fi
 
 grub-mkconfig -o /boot/grub/grub.cfg
 
@@ -172,7 +243,7 @@ grub-mkconfig -o /boot/grub/grub.cfg
 
 (
   su $oUSER;
-  git clone $oDOTFILES $HOME/.dotfiles;
+  git clone $oDOTFILES ~/.dotfiles;
 )
 
 # sudo.sh
@@ -182,28 +253,22 @@ grub-mkconfig -o /boot/grub/grub.cfg
   ./sudo.sh;
 )
 
-# temp enable (disable below)
+# no password for USER
+
 sed -i "s/# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/%wheel ALL=(ALL:ALL) NOPASSWD: ALL/g" /etc/sudoers
-
-# switch
-
-su $oUSER
 
 # user.sh
 
 (
-  cd /home/$oUSER/.dotfiles;
+  su $oUSER
+  cd ~/.dotfiles;
   ./user.sh;
 )
-
-# root
-
-exit
 
 # cleanup /env
 
 rm /env
 
-# disable nopasswd
+# reset password for USER
 
 sed -i "s/%wheel ALL=(ALL:ALL) NOPASSWD: ALL/# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/g" /etc/sudoers

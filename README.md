@@ -25,10 +25,10 @@ Automate the base of your Arch Linux install (as per the wiki's first steps):
   - base + base+devel
   - linux + linux-firmware
   - microcode patches (configured with oUCODE, detected automatically)
-  - sof-firmware + pulseaudio
+  - sof-firmware
   - git
 
-- Get basic bootmanager with GRUB configured.
+- Get basic bootmanager with GRUB installed.
 
 (1) [Boot the live environment.](https://wiki.archlinux.org/title/Installation_guide#Boot_the_live_environment)
 
@@ -41,7 +41,7 @@ $ export oTZ="Australia/Sydney"
 $ export oLANG="en_AU"
 ```
 
-(2.b) Or from a 'archlessrc' file in your dotfiles folder/repo (see
+(2.b) Or from a 'archless' file in your dotfiles folder/repo (see
 [Config](#config))
 
 ```bash
@@ -66,3 +66,7 @@ bash. You may even want to fork the install script and use that instead.
 ```bash
 $ curl https://peterboyer.github.io/archless/install.sh | bash
 ```
+
+## Options
+
+See environment variable options at top of `install.sh`.
