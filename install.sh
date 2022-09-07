@@ -241,12 +241,12 @@ grub-mkconfig -o /boot/grub/grub.cfg
 
 # dotfiles
 
-git clone $oDOTFILES /home/$oUSER/.dotfiles;
-chown -R $oUSER /home/$oUSER/.dotfiles;
+git clone $oDOTFILES /home/$oUSER/_dotfiles;
+chown -R $oUSER /home/$oUSER/_dotfiles;
 
 # sudo.sh
 
-. /home/$oUSER/.dotfiles/sudo.sh;
+. /home/$oUSER/_dotfiles/sudo.sh;
 
 # no password for USER
 
@@ -255,7 +255,7 @@ sed -i "s/# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/%wheel ALL=(ALL:ALL) NOPASSWD: AL
 # user.sh
 
 su $oUSER
-. /home/$oUSER/.dotfiles/user.sh;
+. /home/$oUSER/_dotfiles/user.sh;
 exit
 
 # cleanup /env
