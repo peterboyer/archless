@@ -124,7 +124,7 @@ fi
 
 env | grep -E '^o'
 
-exit
+read -p "archless: press <enter> to confirm"
 
 # https://wiki.archlinux.org/title/Installation_guide#Update_the_system_clock
 
