@@ -62,9 +62,9 @@ if [[ -n "$oPROFILE" ]]; then
   elif [[ "$oPROFILE" =~ ^[a-zA-Z]+\/[.a-zA-Z]+$ ]]; then
     oPROFILE="https://raw.githubusercontent.com/$oPROFILE/main/archless"
   fi
-  curl "$oPROFILE" -o /profile
-  source /profile
-  rm /profile
+  curl "$oPROFILE" -o ./profile
+  source ./profile
+  rm ./profile
 fi
 
 if [[ "$oDOTFILES" == "*" ]]; then
@@ -77,6 +77,10 @@ if [[ -n "$oDOTFILES" ]]; then
   elif [[ "$DOTFILES" =~ ^[a-zA-Z]+\/[.a-zA-Z]+$ ]]; then
     oDOTFILES="https://github.com/$oDOTFILES.git"
   fi
+fi
+
+if [[ "$oDOTFILES_ROOT" =~ ^[^\/] ]]; then
+  oDOTFILES_ROOT="/$oDOTFILES_ROOT"
 fi
 
 # devices
@@ -119,6 +123,8 @@ if [[ "$oUCODE" == "auto" ]]; then
 fi
 
 env | grep -E '^o'
+
+exit
 
 # https://wiki.archlinux.org/title/Installation_guide#Update_the_system_clock
 
@@ -241,12 +247,13 @@ grub-mkconfig -o /boot/grub/grub.cfg
 
 # dotfiles
 
+su $oUSER
 git clone $oDOTFILES /home/$oUSER/_dotfiles;
-chown -R $oUSER /home/$oUSER/_dotfiles;
+exit
 
 # sudo.sh
 
-. /home/$oUSER/_dotfiles/sudo.sh;
+. /home/$oUSER/_dotfiles$oDOTFILES_ROOT/sudo.sh;
 
 # no password for USER
 
@@ -255,7 +262,7 @@ sed -i "s/# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/%wheel ALL=(ALL:ALL) NOPASSWD: AL
 # user.sh
 
 su $oUSER
-. /home/$oUSER/_dotfiles/user.sh;
+. /home/$oUSER/_dotfiles$oDOTFILES_ROOT/user.sh;
 exit
 
 # cleanup /env
