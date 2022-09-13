@@ -84,10 +84,6 @@ if [[ -n "$oDOTFILES" ]]; then
   fi
 fi
 
-if [[ "$oDOTFILES_ROOT" =~ ^[^\/] ]]; then
-  oDOTFILES_ROOT="/$oDOTFILES_ROOT"
-fi
-
 # devices
 
 if [[ "$oDEV" == "*" ]]; then
@@ -272,22 +268,6 @@ grub-mkconfig -o /boot/grub/grub.cfg
 
 su -m $oUSER -s /bin/bash -c "git clone $oDOTFILES /home/$oUSER/_dotfiles"
 
-# sudo.sh
-
-. /home/$oUSER/_dotfiles$oDOTFILES_ROOT/sudo.sh;
-
-# no password for USER
-
-sed -i "s/# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/%wheel ALL=(ALL:ALL) NOPASSWD: ALL/g" /etc/sudoers
-
-# user.sh
-
-su -m $oUSER -c "/bin/bash /home/$oUSER/_dotfiles$oDOTFILES_ROOT/user.sh"
-
 # cleanup /env
 
 rm /env
-
-# reset password for USER
-
-sed -i "s/%wheel ALL=(ALL:ALL) NOPASSWD: ALL/# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/g" /etc/sudoers
