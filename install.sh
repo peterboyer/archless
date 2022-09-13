@@ -3,6 +3,8 @@
 set -x
 set -e
 
+if [[ "$1" != "--continue" ]]; then
+
 # if set, will load script that exports options for install
 #   - <USER> --> resolve to raw.githubusercontent.com/<USER>/dotfiles/main/archless
 #   - <USER>/<REPO> --> resolve to raw.githubusercontent.com/<USER>/<REPO>/main/archless
@@ -17,6 +19,9 @@ export oPROFILE=${oPROFILE:-$PROFILE}
 #   - /sudo.sh (any root system changes as root user)
 #   - /user.sh (any changes as non-root user)
 export oDOTFILES=${oDOTFILES:-"*"}
+
+# target device to install system
+export oDEV=${oDEV:-${DEV:-"*"}}
 
 # name of machine (for /etc/hostname and /etc/hosts)
 export oHOST=${oHOST:-arch}
@@ -85,7 +90,9 @@ fi
 
 # devices
 
-vDEV="/dev/$(lsblk | grep disk | awk '{ print $1 }')"
+if [[ "$oDEV" == "*" ]]; then
+  export oDEV="/dev/$(lsblk | grep -E 'disk $' | awk '{ print $1 }')"
+fi
 
 # https://wiki.archlinux.org/title/Installation_guide#Verify_the_boot_mode
 
@@ -106,11 +113,11 @@ fi
 
 INDEX=1; next() { INDEX=$((INDEX+1)); }
 PREFIX=""
-if [[ -n "$(echo $vDEV | grep nvme)" ]]; then PREFIX="p"; fi
+if [[ -n "$(echo $oDEV | grep nvme)" ]]; then PREFIX="p"; fi
 
-if [[ "$oSCHEME" == "gpt" ]]; then vDEV_BOOT="$vDEV$PREFIX$INDEX"; next; fi
-if [[ "$oSWAP" != "0" ]]; then vDEV_SWAP="$vDEV$PREFIX$INDEX"; next; fi
-vDEV_ROOT="$vDEV$PREFIX$INDEX"; next;
+if [[ "$oSCHEME" == "gpt" ]]; then oDEV_BOOT="$oDEV$PREFIX$INDEX"; next; fi
+if [[ "$oSWAP" != "0" ]]; then oDEV_SWAP="$oDEV$PREFIX$INDEX"; next; fi
+oDEV_ROOT="$oDEV$PREFIX$INDEX"; next;
 
 # microcode
 
@@ -124,7 +131,7 @@ fi
 
 env | grep -E '^o'
 
-read -p "archless: press <enter> to confirm"
+read -p "archless: press <enter> to confirm ..." sure
 
 # https://wiki.archlinux.org/title/Installation_guide#Update_the_system_clock
 
@@ -136,28 +143,36 @@ timedatectl set-ntp true
   if [[ "$oSCHEME" == "mbr" ]]; then echo o; fi
   if [[ "$oSCHEME" == "gpt" ]]; then echo g; fi
 
-  if [[ "$oSCHEME" == "gpt" ]]; then echo n; echo; echo; echo +300M; fi
+  # boot
+  if [[ "$oSCHEME" == "gpt" ]]; then
+    echo n; echo; echo; echo +300M;
+    echo t; echo 1; echo 1;
+  fi
 
-  if [[ "$oSCHEME" == "mbr" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo; echo +${oSWAP}G; fi
-  if [[ "$oSCHEME" == "gpt" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo +${oSWAP}G; fi
+  # swap
+  if [[ "$oSWAP" != "0" ]]; then
+    if [[ "$oSCHEME" == "mbr" ]]; then echo n; echo; echo; echo; echo +${oSWAP}G; fi
+    if [[ "$oSCHEME" == "gpt" ]]; then echo n; echo; echo; echo +${oSWAP}G; fi
+    echo t; echo 2; echo 19; fi
 
-  if [[ "$oSCHEME" == "mbr" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo; echo; fi
-  if [[ "$oSCHEME" == "gpt" && "$oSWAP" != "0" ]]; then echo n; echo; echo; echo; fi
+  # root
+  if [[ "$oSCHEME" == "mbr" ]]; then echo n; echo; echo; echo; echo; fi
+  if [[ "$oSCHEME" == "gpt" ]]; then echo n; echo; echo; echo; fi
 
   echo w;
-) | fdisk $vDEV --wipe always --wipe-partitions always &> /dev/null
+) | fdisk $oDEV --wipe always --wipe-partitions always
 
 # https://wiki.archlinux.org/title/Installation_guide#Format_the_partitions
 
-if [[ -n "$vDEV_BOOT" ]]; then mkfs.fat -F 32 $vDEV_BOOT; fi
-if [[ -n "$vDEV_SWAP" ]]; then mkswap $vDEV_SWAP; fi
-mkfs.$oFS -f $vDEV_ROOT
+if [[ -n "$oDEV_BOOT" ]]; then mkfs.fat -F 32 $oDEV_BOOT; fi
+if [[ -n "$oDEV_SWAP" ]]; then mkswap $oDEV_SWAP; fi
+mkfs.$oFS -f $oDEV_ROOT
 
 # https://wiki.archlinux.org/title/Installation_guide#Mount_the_file_systems
 
-mount --mkdir $vDEV_ROOT /mnt
-if [[ -n "$vDEV_BOOT" ]]; then mount --mkdir $vDEV_BOOT /mnt/boot; fi
-if [[ -n "$vDEV_SWAP" ]]; then swapon $vDEV_SWAP; fi
+mount --mkdir $oDEV_ROOT /mnt
+if [[ -n "$oDEV_BOOT" ]]; then mount --mkdir $oDEV_BOOT /mnt/boot; fi
+if [[ -n "$oDEV_SWAP" ]]; then swapon $oDEV_SWAP; fi
 
 # https://wiki.archlinux.org/title/Installation_guide#Fstab
 
@@ -189,19 +204,20 @@ yes | pacstrap /mnt \
 
 # https://wiki.archlinux.org/title/Installation_guide#Chroot
 
+# copy environment options
 env | grep -E '^o' > /mnt/env
-echo "vDEV=$vDEV" >> /mnt/env
+
+# copy ./install.sh script into /mnt
+cp $0 /mnt
 
 # chroot
-
 arch-chroot /mnt
+
+fi # --continue
 
 source /env
 
 # https://wiki.archlinux.org/title/Installation_guide#Time_zone
-
-# TODO: verify that this actually persists ntp config into new install
-timedatectl set-ntp true
 
 ln -sf /usr/share/zoneinfo/$oTZ /etc/localtime
 hwclock --systohc
@@ -240,16 +256,21 @@ sed -i "s/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/g" /etc/sudoers
 
 # https://wiki.archlinux.org/title/Installation_guide#Boot_loader
 
-if [[ "$oSCHEME" == "mbr" ]]; then grub-install --target=i386-pc $vDEV; fi
-if [[ "$oSCHEME" == "gpt" ]]; then grub-install --target $vDEV; fi
-
+if [[ "$oSCHEME" == "mbr" ]]; then grub-install --target=i386-pc $oDEV; fi
+if [[ "$oSCHEME" == "gpt" ]]; then
+  mkinitcpio -P
+  mkdir -p /boot/EFI
+  mount $oDEV_BOOT /boot/EFI
+  grub-install \
+    --target=x86_64-efi \
+    --bootloader-id=arch \
+    --recheck
+fi
 grub-mkconfig -o /boot/grub/grub.cfg
 
 # dotfiles
 
-su $oUSER
-git clone $oDOTFILES /home/$oUSER/_dotfiles;
-exit
+su -m $oUSER -s /bin/bash -c "git clone $oDOTFILES /home/$oUSER/_dotfiles"
 
 # sudo.sh
 
@@ -261,9 +282,7 @@ sed -i "s/# %wheel ALL=(ALL:ALL) NOPASSWD: ALL/%wheel ALL=(ALL:ALL) NOPASSWD: AL
 
 # user.sh
 
-su $oUSER
-. /home/$oUSER/_dotfiles$oDOTFILES_ROOT/user.sh;
-exit
+su -m $oUSER -c "/bin/bash /home/$oUSER/_dotfiles$oDOTFILES_ROOT/user.sh"
 
 # cleanup /env
 
