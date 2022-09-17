@@ -213,7 +213,7 @@ cp $0 /mnt
 # chroot
 arch-chroot /mnt
 
-fi # --continue
+else # /env
 
 source /env
 
@@ -276,3 +276,5 @@ grub-mkconfig -o /boot/grub/grub.cfg
 
 git clone $oDOTFILES /home/$oUSER/_dotfiles
 chown -R $oUSER:$oUSER /home/$oUSER/_dotfiles
+
+fi
