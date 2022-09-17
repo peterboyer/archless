@@ -268,6 +268,8 @@ grub-mkconfig -o /boot/grub/grub.cfg
 
 su -m $oUSER -s /bin/bash -c "git clone $oDOTFILES /home/$oUSER/_dotfiles"
 
+# TODO: change remote to ssh variant is github provider
+
 # cleanup /env
 
 rm /env
