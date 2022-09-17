@@ -200,7 +200,7 @@ yes | pacstrap /mnt \
   grub efibootmgr \
   networkmanager \
   sof-firmware \
-  git
+  man git
 
 # https://wiki.archlinux.org/title/Installation_guide#Chroot
 
