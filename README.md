@@ -26,23 +26,49 @@ Automate the base of your Arch Linux install (as per the wiki's first steps):
   - linux + linux-firmware
   - microcode patches (configured with oUCODE, detected automatically)
   - sof-firmware
-  - git
+  - man git
 
 - Get basic bootmanager with GRUB installed.
 
+# Usage
+
 (1) [Boot the live environment.](https://wiki.archlinux.org/title/Installation_guide#Boot_the_live_environment)
 
-(2) Set any options (see [Options](#options))
-
-(2.a) As environment variables:
+(2) Download install script as `./install.sh`:
 
 ```bash
+$ curl https://peterboyer.github.io/archless/install.sh -o install.sh
+$ chmod +x install.sh
+
+# (optional) set any option (if not using PROFILE)
 $ export oTZ="Australia/Sydney"
 $ export oLANG="en_AU"
+
+# (optional) set target profile* github user/[repo] (to source `archless` file from)
+$ export PROFILE=peterboyer
+
+# (optional) set target disk (if detected wrong one)
+$ export DEV=nvme0n1
 ```
 
-(2.b) Or from a 'archless' file in your dotfiles folder/repo (see
-[Config](#config))
+(3) Run the install script:
+
+I would encourage that you read over the script first before executing with
+bash. You may even want to fork the install script and use that instead.
+
+```bash
+# top-level
+$ ./install.sh
+```
+
+(4) Continue install script within arch-chroot:
+
+```bash
+# arch-chroot
+$ ./install.sh
+```
+
+# PROFILE
 
 ```bash
 $ export PROFILE="<GH_USER>"
@@ -56,15 +82,6 @@ $ export PROFILE="<GH_USER>/<GH_REPO>/<FILE>"
 
 $ export PROFILE="<CUSTOM_URL>"
 # from: <CUSTOM_URL>
-```
-
-(3) Run the installer
-
-I would encourage that you read over the script first before executing with
-bash. You may even want to fork the install script and use that instead.
-
-```bash
-$ curl https://peterboyer.github.io/archless/install.sh | bash
 ```
 
 ## Options
