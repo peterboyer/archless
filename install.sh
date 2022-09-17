@@ -3,7 +3,8 @@
 set -x
 set -e
 
-if [[ "$1" != "--continue" ]]; then
+# if /env doesn't exist yet, then we are outside arch-chroot /mnt
+if [[ ! -e "/env" ]]; then
 
 # if set, will load script that exports options for install
 #   - <USER> --> resolve to raw.githubusercontent.com/<USER>/dotfiles/main/archless
@@ -22,6 +23,9 @@ export oDOTFILES=${oDOTFILES:-"*"}
 
 # target device to install system
 export oDEV=${oDEV:-${DEV:-"*"}}
+export oDEV_BOOT
+export oDEV_SWAP
+export oDEV_ROOT
 
 # name of machine (for /etc/hostname and /etc/hosts)
 export oHOST=${oHOST:-arch}
@@ -254,11 +258,15 @@ sed -i "s/# %wheel ALL=(ALL:ALL) ALL/%wheel ALL=(ALL:ALL) ALL/g" /etc/sudoers
 
 if [[ "$oSCHEME" == "mbr" ]]; then grub-install --target=i386-pc $oDEV; fi
 if [[ "$oSCHEME" == "gpt" ]]; then
+  set +e
   mkinitcpio -P
+  set -e
+
   mkdir -p /boot/EFI
   mount $oDEV_BOOT /boot/EFI
   grub-install \
     --target=x86_64-efi \
+    --efi-directory=/boot/EFI \
     --bootloader-id=arch \
     --recheck
 fi
@@ -266,8 +274,5 @@ grub-mkconfig -o /boot/grub/grub.cfg
 
 # dotfiles
 
-su -m $oUSER -s /bin/bash -c "git clone $oDOTFILES /home/$oUSER/_dotfiles"
-
-# cleanup /env
-
-rm /env
+git clone $oDOTFILES /home/$oUSER/_dotfiles
+chown -R $oUSER:$oUSER /home/$oUSER/_dotfiles
