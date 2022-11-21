@@ -57,6 +57,14 @@ export oSWAP=${oSWAP:-memory}
 #   - none --> skip
 export oUCODE=${oUCODE:-auto}
 
+# install linux kernel when doing pacstrap
+export oKERNEL=${oKERNEL:-linux}
+
+# install linux kernel headers when doing pacstrap
+#   - auto --> use oKERNEL + "-headers" suffix
+#   - none --> skip
+export oKERNEL_HEADERS=${oKERNEL_HEADERS:-auto}
+
 # set partition scheme
 #   - auto --> automatically determine from boot mode via ../efivars dir
 #   - mbr/gpt --> force specific partiton scheme
@@ -129,6 +137,14 @@ if [[ "$oUCODE" == "auto" ]]; then
   fi
 fi
 
+# kernel
+
+if [[ "$oKERNEL_HEADERS" == "auto" ]]; then
+  oKERNEL_HEADERS="$oKERNEL-headers"
+elif [[ "$oKERNEL_HEADERS" == "none" ]]; then
+  oKERNEL_HEADERS=""
+fi
+
 env | grep -E '^o'
 
 read -p "archless: press <enter> to confirm ..." sure
@@ -196,7 +212,7 @@ fi
 
 yes | pacstrap /mnt \
   base base-devel \
-  linux linux-firmware $UCODE \
+  $oKERNEL $oKERNEL_HEADERS linux-firmware $UCODE \
   grub efibootmgr \
   networkmanager \
   sof-firmware \
